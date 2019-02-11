@@ -179,6 +179,7 @@ def predict():
     prediction = rospy.Publisher('prediction', Arrays, queue_size=10)
         
     R = rospy.get_param('~predict_pub_rate')
+    wait_for_train = rospy.get_param('~wait_for_train')
     rate = rospy.Rate(1)
     
     YStart = rospy.get_param('~YStart')
@@ -188,9 +189,10 @@ def predict():
     Loc = GetLocal()    
     
 #    local2 = LocalModels()
-    LocMsg = rospy.wait_for_message('localGP',LocalGP)
-    local = deconstructMsg(LocMsg)  
-    Loc.local = local
+    if not wait_for_train:
+        LocMsg = rospy.wait_for_message('localGP',LocalGP)
+        local = deconstructMsg(LocMsg)  
+        Loc.local = local
 #    rospy.Rate(0.05).sleep
     "Main Loop"
     while not rospy.is_shutdown():
@@ -198,7 +200,13 @@ def predict():
         "Get next model"   
         print("Get next model")             
 #        rospy.Subscriber('localGP',LocalGP,callback)
-        rospy.Subscriber('localGP',LocalGP,Loc.callback)
+        if wait_for_train:
+            LocMsg = rospy.wait_for_message('localGP',LocalGP)
+            local = deconstructMsg(LocMsg)  
+            Loc.local = local
+            Loc.count +=1
+        else:
+            rospy.Subscriber('localGP',LocalGP,Loc.callback)
 
 #        LocMsg = rospy.wait_for_message('localGP',LocalGP)
 #        local = deconstructMsg(LocMsg)

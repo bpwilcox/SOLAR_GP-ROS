@@ -53,6 +53,7 @@ def poser():
 
 if __name__ == '__main__':
     try:
+        rospy.init_node('sensor_node')
         poser()
     except rospy.ROSInterruptException:
         pass
