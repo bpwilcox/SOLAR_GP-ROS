@@ -41,9 +41,9 @@ def poser():
         newpoint.y = trans[1]
         newpoint.z = trans[2]
         pub2.publish(newpoint)
-        Xexp = np.array([trans[0],trans[1]], dtype=numpy.float32)
+        Xexp = np.array([trans[0],trans[1], trans[2]], dtype=numpy.float32)
         # a = numpy.array([1.0, 2.1, 3.2, 4.3, 5.4, 6.5], dtype=numpy.float32)
-        pub.publish(Xexp)
+        # pub.publish(Xexp)
 
 #        if len(marker.points) > 40:
 #           marker.points.pop(0)  # To make the old trail disappear continuously

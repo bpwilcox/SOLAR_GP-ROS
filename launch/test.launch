@@ -1,6 +1,6 @@
 <launch>
 
-  <arg name="js_pub_rate" default="1" />
+  <arg name="js_pub_rate" default="100" />
   <arg name="tr_pub_rate" default="100" />
   <arg name="tf_pub_rate" default="100" />
   <arg name="pos_pub_rate" default="100" />
@@ -12,11 +12,10 @@
   <arg name="drift_num" default ="1" />
   <arg name="gui" default="false" />
   <arg name="sequential" default="true" />
-
+  <arg name="n_joints" default ="2" />
 
 
   <param name="robot_description" textfile="$(find bwrobot)/urdf/2link_robot.urdf" />
-
 
   <node name="sensor_node" pkg="bwrobot" type="sensing.py">
   	<param name="tf_ee_pub_rate" value="$(arg pos_pub_rate)" />
@@ -26,6 +25,7 @@
   	<param name="predict_pub_rate" value="$(arg js_pub_rate)" />
   	<param name="wait_for_train" value="$(arg sequential)" />
   	<rosparam param ="YStart" subst_value="True">$(arg JointInit)</rosparam>
+	<param name="num_joints" value="$(arg n_joints)" />
   </node>
 
   <node name="train_node" pkg="bwrobot" type="training.py">
@@ -35,14 +35,18 @@
 	<param name="num_inducing" value="$(arg num_ind)" />
 	<param name="wgen" value="$(arg w_thresh)" />
 	<param name="drift" value="$(arg drift_num)" />
+	<param name="num_joints" value="$(arg n_joints)" />
   </node>
 
 
   <node name="actuator_node" pkg="bwrobot" type="actuation.py">
   	<param name="controller_pub_rate" value="$(arg tf_pub_rate)" />
+	<param name="num_joints" value="$(arg n_joints)" />
   </node>
 
   <node name="Teleop_server" pkg="bwrobot" type="teleop_server.py">
+  	<rosparam param ="YStart" subst_value="True">$(arg JointInit)</rosparam>
+	<param name="num_joints" value="$(arg n_joints)" />
   </node>
   
   <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />

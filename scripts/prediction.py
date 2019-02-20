@@ -10,7 +10,7 @@ from TestData import TestTrajectory
 import RobotModels
 import osgpr_GPy
 #from Local import LocalModels
-from LocMemEff import LocalModels
+from SOLAR_core import LocalModels
 
 from sensor_msgs.msg import JointState
 
@@ -36,47 +36,49 @@ def callback(LocMsg):
 def deconstructMsg(LocMsg):
     
     W = LocMsg.W
-    W = np.diag([1/(W[0]**2), 1/(W[1]**2)])  
-
-    
+    W = np.diag([W[0],W[1],W[2]])
+  
     M = LocMsg.M
     LocalData = []
     Models = []
+    xdim = LocMsg.xdim
+    ndim = LocMsg.ndim
+
     for L in LocMsg.localGPs:
         
         X_loc = []
         X_loc.append(L.numloc)
         X_loc.append(L.numloc)
-        X_loc.append(np.array(L.xmean).reshape(1,2))
-        X_loc.append(np.array(L.ymean).reshape(1,2))
+        X_loc.append(np.array(L.xmean).reshape(1,xdim))
+        X_loc.append(np.array(L.ymean).reshape(1,ndim))
         X_loc.append(True)
         
         LocalData.append(X_loc)
 #        kern_var = L.kern_var
 #        kern_lengthscale = L.kern_lengthscale
-        X = np.empty([0,2]) 
-        Y = np.empty([0,2]) 
+        X = np.empty([0,xdim]) 
+        Y = np.empty([0,ndim]) 
 
-        Z = np.empty([0,2]) 
-        Z_old = np.empty([0,2])
-        mu_old = np.empty([0,2])
+        Z = np.empty([0,xdim]) 
+        Z_old = np.empty([0,xdim])
+        mu_old = np.empty([0,ndim])
         Su_old = np.empty([0,len(L.Z_old)])
         Kaa_old = np.empty([0,len(L.Z_old)])
 
-        kern = GPy.kern.RBF(2,ARD=True)
+        kern = GPy.kern.RBF(3,ARD=True)
         kern.variance = L.kern_var
         kern.lengthscale = L.kern_lengthscale
         
         for x,y in zip(L.X,L.Y):
-            X = np.vstack((X,np.array(x.array).reshape(1,2)))       
-            Y = np.vstack((Y,np.array(y.array).reshape(1,2)))       
+            X = np.vstack((X,np.array(x.array).reshape(1,xdim)))       
+            Y = np.vstack((Y,np.array(y.array).reshape(1,ndim)))       
                        
         for z in L.Z:
-            Z = np.vstack((Z,np.array(z.array).reshape(1,2)))
+            Z = np.vstack((Z,np.array(z.array).reshape(1,xdim)))
             
         for z,mu,su,ka in zip(L.Z_old, L.mu_old,L.Su_old,L.Kaa_old):
-            Z_old = np.vstack((Z_old,np.array(z.array).reshape(1,2)))        
-            mu_old = np.vstack((mu_old,np.array(mu.array).reshape(1,2)))        
+            Z_old = np.vstack((Z_old,np.array(z.array).reshape(1,xdim)))        
+            mu_old = np.vstack((mu_old,np.array(mu.array).reshape(1,ndim)))        
             Su_old = np.vstack((Su_old,np.array(su.array).reshape(1,len(L.Z_old))))        
             Kaa_old = np.vstack((Kaa_old,np.array(ka.array).reshape(1,len(L.Z_old))))    
             
@@ -93,61 +95,67 @@ def deconstructMsg(LocMsg):
     local.M = M
     local.LocalData = LocalData
     local.Models = Models
+    local.xdim = xdim
+    local.ndim = ndim
     
     
     return local
 
 class GetLocal():
-    def __init__(self):
+    def __init__(self, encode = True):
         self.local = LocalModels()
+        self.encode_angles = encode
 #        self.publisher = 
 #        self.subscriber
         self.count = 0
-    
+
     def callback(self,LocMsg):
         
         W = LocMsg.W
 #        W = np.diag([1/(W[0]**2), 1/(W[1]**2)])  
-        W = np.diag([W[0],W[1]])
+        W = np.diag([W[0],W[1],W[2]])
 
         M = LocMsg.M
         LocalData = []
         Models = []
+        xdim = LocMsg.xdim
+        ndim = LocMsg.ndim
+
         for L in LocMsg.localGPs:
             
             X_loc = []
             X_loc.append(L.numloc)
             X_loc.append(L.numloc)
-            X_loc.append(np.array(L.xmean).reshape(1,2))
-            X_loc.append(np.array(L.ymean).reshape(1,2))
+            X_loc.append(np.array(L.xmean).reshape(1,xdim))
+            X_loc.append(np.array(L.ymean).reshape(1,ndim))
             X_loc.append(True)
             
             LocalData.append(X_loc)
     #        kern_var = L.kern_var
     #        kern_lengthscale = L.kern_lengthscale
-            X = np.empty([0,2]) 
-            Y = np.empty([0,2]) 
+            X = np.empty([0,xdim]) 
+            Y = np.empty([0,ndim]) 
     
-            Z = np.empty([0,2]) 
-            Z_old = np.empty([0,2])
-            mu_old = np.empty([0,2])
+            Z = np.empty([0,xdim]) 
+            Z_old = np.empty([0,xdim])
+            mu_old = np.empty([0,ndim])
             Su_old = np.empty([0,len(L.Z_old)])
             Kaa_old = np.empty([0,len(L.Z_old)])
     
-            kern = GPy.kern.RBF(2,ARD=True)
+            kern = GPy.kern.RBF(xdim,ARD=True)
             kern.variance = L.kern_var
             kern.lengthscale = L.kern_lengthscale
             
             for x,y in zip(L.X,L.Y):
-                X = np.vstack((X,np.array(x.array).reshape(1,2)))       
-                Y = np.vstack((Y,np.array(y.array).reshape(1,2)))       
+                X = np.vstack((X,np.array(x.array).reshape(1,xdim)))       
+                Y = np.vstack((Y,np.array(y.array).reshape(1,ndim)))       
                            
             for z in L.Z:
-                Z = np.vstack((Z,np.array(z.array).reshape(1,2)))
+                Z = np.vstack((Z,np.array(z.array).reshape(1,xdim)))
                 
             for z,mu,su,ka in zip(L.Z_old, L.mu_old,L.Su_old,L.Kaa_old):
-                Z_old = np.vstack((Z_old,np.array(z.array).reshape(1,2)))        
-                mu_old = np.vstack((mu_old,np.array(mu.array).reshape(1,2)))        
+                Z_old = np.vstack((Z_old,np.array(z.array).reshape(1,xdim)))        
+                mu_old = np.vstack((mu_old,np.array(mu.array).reshape(1,ndim)))        
                 Su_old = np.vstack((Su_old,np.array(su.array).reshape(1,len(L.Z_old))))        
                 Kaa_old = np.vstack((Kaa_old,np.array(ka.array).reshape(1,len(L.Z_old))))    
                 
@@ -164,15 +172,18 @@ class GetLocal():
         local.M = M
         local.LocalData = LocalData
         local.Models = Models
+        local.xdim = xdim
+        local.ndim = ndim
 #        print(local.W)        
         self.local = local    
         self.count+=1
         
+def decode_ang(q):
+    d = int(np.size(q,1)/2)
+    decoding = np.arctan2(q[:,:d], q[:,d:]).reshape(np.size(q,0),d)
+    return decoding
 
 def predict():
-#    global local
-#    global woo
-
 
     "ROS Settings"
     rospy.init_node('predict_node')
@@ -180,26 +191,24 @@ def predict():
         
     R = rospy.get_param('~predict_pub_rate')
     wait_for_train = rospy.get_param('~wait_for_train')
-    rate = rospy.Rate(1)
+    rate = rospy.Rate(R)
+    num_joints = rospy.get_param('~num_joints')
     
     YStart = rospy.get_param('~YStart')
-    YStart = np.array(np.deg2rad(YStart)).reshape(1,2)
-    Yexp = YStart 
-    i = 1
+    YStart = np.array(np.deg2rad(YStart)).reshape(1,num_joints)
+    i = 0
     Loc = GetLocal()    
+    Yexp = Loc.local.encode_ang(YStart)
     
 #    local2 = LocalModels()
     if not wait_for_train:
         LocMsg = rospy.wait_for_message('localGP',LocalGP)
         local = deconstructMsg(LocMsg)  
         Loc.local = local
-#    rospy.Rate(0.05).sleep
+
     "Main Loop"
     while not rospy.is_shutdown():
-        print(i)
         "Get next model"   
-        print("Get next model")             
-#        rospy.Subscriber('localGP',LocalGP,callback)
         if wait_for_train:
             LocMsg = rospy.wait_for_message('localGP',LocalGP)
             local = deconstructMsg(LocMsg)  
@@ -208,33 +217,29 @@ def predict():
         else:
             rospy.Subscriber('localGP',LocalGP,Loc.callback)
 
-#        LocMsg = rospy.wait_for_message('localGP',LocalGP)
-#        local = deconstructMsg(LocMsg)
-#        Loc.local = local
-#        local2 = local
-#        if 'woo' in globals():
-#            local2 = local
-#        else:
-#            continue
-#        print(Loc.count)
-#        print(Loc.local.W)
         "Grab Teleoperator command"
         print("get teleop")
         
         data = teleop_client(i) 
-        xnext = np.array([data.x,data.y])
-#        print(xnext)
+        xnext = np.array([data.x,data.y,data.z])
 
-        "Prediction"   
-        Ypred,_ = Loc.local.prediction(xnext.reshape(1,2),Y_prev = Yexp)
-#        Ypred,_ = local.prediction(xnext.reshape(1,2),Y_prev = Yexp)    
-#        Ypred,_ = local.Models[0].predict(xnext.reshape(1,2))
-        Ypost = np.vstack((Yexp,Ypred))   
-        Ypost = np.unwrap(Ypost,axis=0)
-        Yexp = Ypost[-1].reshape(1,2)
-        print("Ypred: " + str(Yexp))
-        Y = [float(Yexp[0][0]), float(Yexp[0][1])]
-        prediction.publish(Y)
+        "Predict "
+        if Loc.encode_angles:
+            Ypred,_ = Loc.local.prediction(xnext.reshape(1,3),Y_prev = Yexp)
+            Yexp = Ypred
+            Y = decode_ang(Yexp).astype(float)
+            
+        else:
+            Ypred,_ = Loc.local.prediction(xnext.reshape(1,3),Y_prev = Yexp)
+            Ypost = np.vstack((Yexp,Ypred))   
+            Ypost = np.unwrap(Ypost,axis=0)
+            Yexp = Ypost[-1].reshape(1,2)
+            Y = Yexp
+        
+        # Y = [float(Yexp[0][0]), float(Yexp[0][1])],float(Yexp[0][2]),float(Yexp[0][3])
+        #prediction.publish(Y)
+
+        prediction.publish(Y[0,:].tolist())
                
         "Next"        
         i+=1

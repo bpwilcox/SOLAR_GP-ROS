@@ -3,13 +3,13 @@
 import rospy
 import numpy as np
 from geometry_msgs.msg import Point
-#import GPy
+import GPy
 import time
 import Trajectory
 from TestData import TestTrajectory
 import RobotModels
 #from Local import LocalModels
-from LocMemEff import LocalModels
+from SOLAR_core import LocalModels
 
 from sensor_msgs.msg import JointState
 
@@ -29,7 +29,7 @@ def initialize(rate,jspub,cmd,GPpub):
 
     
     njit = rospy.get_param('~njit')
-    YStart = rospy.get_param('~YStart2')
+    YStart = rospy.get_param('~YStart')
 #    rospy.loginfo(YStart)
     YStart = np.array(YStart).reshape(1,2)
     num_inducing = rospy.get_param('~num_inducing')
@@ -41,7 +41,8 @@ def initialize(rate,jspub,cmd,GPpub):
     print(YI)
     XI = np.empty([0,2])
     for y in YI:
-        cmd.position = [y[0], y[1]]
+        #cmd.position = [y[0], y[1]]
+        cmd.position = y.tolist()
         jspub.publish(cmd)
         data = rospy.wait_for_message('experience',Point)
         XI = np.vstack((XI,np.array([data.x,data.y]).reshape(1,2)))       
@@ -127,13 +128,14 @@ def constructMsg(local):
 #    LocMsg.W = np.array(local.mdrift.kern.lengthscale).tolist() 
     LocMsg.W = local.W.diagonal().tolist()
     LocMsg.M = local.M
+    LocMsg.xdim = local.xdim
+    LocMsg.ndim = local.ndim
     
     
     return LocMsg
 
 
 def train():
-
 
     "ROS Settings"
     rospy.init_node('train_node')
@@ -142,60 +144,37 @@ def train():
     traintime = rospy.Publisher('traintime', Float64, queue_size=10)
     jspub = rospy.Publisher('joint_states', JointState, queue_size=10)
     GPpub = rospy.Publisher('localGP',LocalGP,queue_size=10)
+    num_joints = rospy.get_param('~num_joints')
     
     cmd = JointState()
-    cmd.name = ['joint1', 'joint2'] 
-        
+    # cmd.name = ['joint1', 'joint2'] 
+    for i in range(0, num_joints):
+        cmd.name.append('joint' + str(i+1))
+
     "Initialize Local Models"
-    
-#    local,Xtot,Ytot = initialize(rate,jspub,cmd, GPpub)     
     njit = rospy.get_param('~njit')
-    njit = 15
     YStart = rospy.get_param('~YStart')
-    YStart = np.array(np.deg2rad(YStart)).reshape(1,2)
+    YStart = np.array(np.deg2rad(YStart)).reshape(1,num_joints)
     num_inducing = rospy.get_param('~num_inducing')
     w_gen = rospy.get_param('~wgen')
     d = rospy.get_param('~drift')
     
-    local = LocalModels(num_inducing, wgen = w_gen, drift = d, ndim = 2)
-    YI = local.jitROS(njit,YStart)   
-    XI = np.empty([0,2])
-    print(YI)
-#    print(np.rad2deg(YI))
-    twolink = RobotModels.nLink2D(Links = [1,1])
-    Xtr = twolink.fkin(YI)
-#    print(twolink.fkin(YI))
+    local = LocalModels(num_inducing, wgen = w_gen, xdim =3, ndim = num_joints*2)
+    YI = local.jitY(njit,YStart)   
+    XI = np.empty([0,3])
     j = 0
-#    while j < len(YI):
     rospy.Rate(0.5).sleep()
     for y in YI:        
         cmd.header.stamp = rospy.Time.now()
-        cmd.position = [y[0], y[1]]
-#        prediction.publish([y[0],y[1]])
-
-#        cmd.position = [YI[j][0],YI[j][1]]
+        # cmd.position = [y[0], y[1]]
+        cmd.position = y.tolist()
         jspub.publish(cmd)
-#        rate.sleep()
         rospy.Rate(5).sleep()
-        print("get experience")
         data = rospy.wait_for_message('experience',Point)
-#        rospy.Subscriber('experience',Point,callback)
-        XI = np.vstack((XI,np.array([data.x,data.y]).reshape(1,2)))  
-#        XI = np.vstack((XI,np.array([2,0]).reshape(1,2)))     
-
-#        rospy.Rate(1).sleep()
-
-#        XI = np.vstack((XI,np.array([Xexp[0],Xexp[1]]).reshape(1,2)))     
-        print(y)        
-        print(data)
-        print(Xtr[j])
-        
+        XI = np.vstack((XI,np.array([data.x,data.y, data.z]).reshape(1,3)))          
         j +=1
-#        rospy.Rate(100).sleep()
 
-    
-    local.initROS(XI,YI) 
-#    print(local.Models)
+    local.initializeF(XI,YI)
     LocMsg = constructMsg(local)
     GPpub.publish(LocMsg)
     
@@ -206,23 +185,18 @@ def train():
     
     "Main Loop"
     while not rospy.is_shutdown():
-        print("count: " + str(i))
-        "Get Yexp"
-#        print("get Yexp")
-#        data = rospy.wait_for_message('prediction',Arrays)        
-#        Yexp = np.array(data.array).reshape(1,2)
-        
-        data = rospy.wait_for_message('joint_states',JointState)
-        Yexp = np.array(data.position).reshape(1,2)
-        print("Yexp: " + str(Yexp))
-        "Get Xexp"   
-        print("get Xexp")
 
+        "Get Yexp"
+        data = rospy.wait_for_message('joint_states',JointState) # should I use this vs prediction?
+        Y = np.array(data.position).reshape(1,num_joints)        
+        Yexp = local.encode_ang(Y)
+
+        "Get Xexp"   
         data = rospy.wait_for_message('experience',Point)
-        Xexp = np.array([data.x,data.y]).reshape(1,2)
-        print("Xexp: " + str(Xexp))
+        Xexp = np.array([data.x,data.y,data.z]).reshape(1,3)
         
         t1 = time.time()
+
         "Training"
         if Xtot.shape[0] > 50:
             Xtot = np.delete(Xtot,0,0)
@@ -231,13 +205,27 @@ def train():
         Xtot = np.vstack((Xtot,Xexp))
         Ytot = np.vstack((Ytot,Yexp))   
         
-        if i % local.drift == 0:
-            mdrift = local.doOSGPR(Xtot[-local.drift:], Ytot[-local.drift:], local.mdrift,local.num_inducing ,use_old_Z=False, driftZ = False)
-            W = np.diag([1/(mdrift.kern.lengthscale[0]**2), 1/(mdrift.kern.lengthscale[1]**2)])  
+        if i % d == 0:
+            ndrift = 10
+            # mdrift = local.doOSGPR(Xtot[-d:], Ytot[-d:], local.mdrift,local.num_inducing ,use_old_Z=False, driftZ = False)
+            # W = np.diag([1/(mdrift.kern.lengthscale[0]**2), 1/(mdrift.kern.lengthscale[1]**2)])  
+            # local.W = W
+            # local.mdrift = mdrift
+
+            mdrift = GPy.models.GPRegression(Xtot[-ndrift:], Ytot[-ndrift:], GPy.kern.RBF(local.xdim,ARD=True))
+            mdrift.optimize(messages = False)
+            
+            mkl = []
+            for j in range(0, local.xdim):
+                mkl.append(1/(mdrift.kern.lengthscale[j]**2))
+                
+            W = np.diag(mkl)
+
             local.W = W
-            local.mdrift = mdrift    
-      
-        local.partition(Xexp.reshape(len(Xexp),2),Yexp.reshape(len(Yexp),2))
+            local.mdrift = mdrift
+
+
+        local.partition(Xexp.reshape(len(Xexp),local.xdim),Yexp.reshape(len(Yexp),local.ndim))
         try:
             local.train()
         except:
