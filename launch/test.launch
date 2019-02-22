@@ -1,6 +1,6 @@
 <launch>
 
-  <arg name="js_pub_rate" default="100" />
+  <arg name="js_pub_rate" default="1" />
   <arg name="tr_pub_rate" default="100" />
   <arg name="tf_pub_rate" default="100" />
   <arg name="pos_pub_rate" default="100" />
@@ -11,12 +11,14 @@
   <arg name="w_thresh" default ="0.95" />
   <arg name="drift_num" default ="1" />
   <arg name="gui" default="false" />
-  <arg name="sequential" default="true" />
+  <arg name="sequential" default="false" />
   <arg name="n_joints" default ="2" />
 
 
   <param name="robot_description" textfile="$(find bwrobot)/urdf/2link_robot.urdf" />
-
+ 
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+ 
   <node name="sensor_node" pkg="bwrobot" type="sensing.py">
   	<param name="tf_ee_pub_rate" value="$(arg pos_pub_rate)" />
   </node>
@@ -49,7 +51,7 @@
 	<param name="num_joints" value="$(arg n_joints)" />
   </node>
   
-  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+
 
 
 

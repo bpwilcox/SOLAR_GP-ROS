@@ -134,7 +134,6 @@ def constructMsg(local):
     
     return LocMsg
 
-
 def train():
 
     "ROS Settings"
@@ -145,7 +144,7 @@ def train():
     jspub = rospy.Publisher('joint_states', JointState, queue_size=10)
     GPpub = rospy.Publisher('localGP',LocalGP,queue_size=10)
     num_joints = rospy.get_param('~num_joints')
-    
+
     cmd = JointState()
     # cmd.name = ['joint1', 'joint2'] 
     for i in range(0, num_joints):
@@ -188,6 +187,7 @@ def train():
 
         "Get Yexp"
         data = rospy.wait_for_message('joint_states',JointState) # should I use this vs prediction?
+        
         Y = np.array(data.position).reshape(1,num_joints)        
         Yexp = local.encode_ang(Y)
 
@@ -241,7 +241,134 @@ def train():
         "Next"        
         i+=1
         rate.sleep()
-         
+
+
+class Trainer():
+    def __init__(self, num_inducing, w_gen, x_dim, y_dim):
+        self.solarGP = LocalModels(num_inducing, wgen = w_gen, xdim = x_dim, ndim = y_dim)
+        self.Yexp = []
+        self.Xexp = []
+        self.Xtot = []
+        self.Ytot = []
+        rospy.loginfo("init")
+
+    def x_callback(self, xdata):
+        self.Xexp = np.array([xdata.x,xdata.y,xdata.z]).reshape(1,3)         
+
+    def y_callback(self, ydata):
+        Y = np.array(ydata.position).reshape(1,int(self.solarGP.ndim/2))        
+        self.Yexp = self.solarGP.encode_ang(Y)
+
+    def train(self,i,d,ndrift):
+        if self.Xtot.shape[0] > 50:
+            self.Xtot = np.delete(self.Xtot,0,0)
+            self.Ytot = np.delete(self.Ytot,0,0)
+            
+        self.Xtot = np.vstack((self.Xtot,self.Xexp))
+        self.Ytot = np.vstack((self.Ytot,self.Yexp))   
+        
+        if i % d == 0:
+            # mdrift = local.doOSGPR(Xtot[-d:], Ytot[-d:], local.mdrift,local.num_inducing ,use_old_Z=False, driftZ = False)
+            # W = np.diag([1/(mdrift.kern.lengthscale[0]**2), 1/(mdrift.kern.lengthscale[1]**2)])  
+            # local.W = W
+            # local.mdrift = mdrift
+
+            mdrift = GPy.models.GPRegression(self.Xtot[-ndrift:], self.Ytot[-ndrift:], GPy.kern.RBF(self.solarGP.xdim,ARD=True))
+            mdrift.optimize(messages = False)
+            
+            mkl = []
+            for j in range(0, self.solarGP.xdim):
+                mkl.append(1/(mdrift.kern.lengthscale[j]**2))
+                
+            W = np.diag(mkl)
+
+            self.solarGP.W = W
+            self.solarGP.mdrift = mdrift
+
+
+        self.solarGP.partition(self.Xexp,self.Yexp)
+        try:
+            self.solarGP.train()
+        except:
+            pass
+
+
+def train2():
+
+    "ROS Settings"
+    rospy.init_node('train_node')
+    R = rospy.get_param('~train_pub_rate')
+    rate = rospy.Rate(R)
+    traintime = rospy.Publisher('traintime', Float64, queue_size=10)
+    jspub = rospy.Publisher('joint_states', JointState, queue_size=10)
+    GPpub = rospy.Publisher('localGP',LocalGP,queue_size=10)
+    num_joints = rospy.get_param('~num_joints')
+
+    cmd = JointState()
+    for i in range(0, num_joints):
+        cmd.name.append('joint' + str(i+1))
+
+    "Initialize Local Models"
+    njit = rospy.get_param('~njit')
+    YStart = rospy.get_param('~YStart')
+    YStart = np.array(np.deg2rad(YStart)).reshape(1,num_joints)
+    num_inducing = rospy.get_param('~num_inducing')
+    w_gen = rospy.get_param('~wgen')
+    d = rospy.get_param('~drift')
+
+    rospy.loginfo("Start Model Initialization")
+
+    Model = Trainer(num_inducing, w_gen, 3, num_joints*2)
+    rospy.loginfo("through init")
+
+    YI = Model.solarGP.jitY(njit, YStart)
+    XI = np.empty([0,3])
+    rospy.loginfo("Finished jitter")
+
+    for y in YI:        
+        cmd.header.stamp = rospy.Time.now()
+        cmd.position = y.tolist()
+        jspub.publish(cmd)
+
+        rospy.Rate(5).sleep()
+        data = rospy.wait_for_message('experience',Point)
+        rospy.loginfo("got experience")
+
+        XI = np.vstack((XI,np.array([data.x,data.y, data.z]).reshape(1,3))) 
+        # XI = np.vstack((XI, Model.Xexp))
+    rospy.loginfo("Got initial points")
+
+    Model.solarGP.initializeF(XI,YI)
+    LocMsg = constructMsg(Model.solarGP)
+    GPpub.publish(LocMsg)
+    
+    Model.Xtot = Model.solarGP.XI
+    Model.Ytot = Model.solarGP.YI
+    rospy.loginfo("Finished Model Initialization")
+
+    rospy.Subscriber('joint_states',JointState,Model.x_callback)
+    rospy.Subscriber('experience',Point,Model.y_callback)
+    rospy.loginfo("Created Subscribers")
+
+    i = 1
+   
+    "Main Loop"
+    while not rospy.is_shutdown():
+        
+        t1 = time.time()
+        
+        Model.train(i,d,10)
+        traintime.publish(t2-t1)
+
+        LocMsg = constructMsg(Model.solarGP)
+        GPpub.publish(LocMsg)
+        
+        t2 = time.time() 
+        
+        "Next"        
+        i+=1
+        rate.sleep()
+
 
 if __name__ == '__main__':
     try:
