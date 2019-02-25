@@ -206,7 +206,7 @@ def predict():
     Loc = GetLocal()    
     Yexp = Loc.local.encode_ang(YStart)
     
-    Teleoperator = phantom_teleop.phantom_teleop()    
+    # Teleoperator = phantom_teleop.phantom_teleop()    
 #    local2 = LocalModels()
     if not wait_for_train:
         LocMsg = rospy.wait_for_message('localGP',LocalGP)
@@ -230,10 +230,10 @@ def predict():
         # data = teleop_client(i) 
         # xnext = np.array([data.x,data.y,data.z])
         
-        # data = phantom_client() 
+        data = phantom_client() 
+        xnext = np.array([data.pose.pose.position.x,data.pose.pose.position.y,data.pose.pose.position.z])
+        # data = Teleoperator.nextPose
         # xnext = np.array([data.pose.position.x,data.pose.position.y,data.pose.position.z])
-        data = Teleoperator.nextPose
-        xnext = np.array([data.pose.position.x,data.pose.position.y,data.pose.position.z])
 
 
         "Predict "

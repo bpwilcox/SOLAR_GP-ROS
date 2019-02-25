@@ -11,45 +11,7 @@ from bwrobot.srv import *
 from bwrobot.msg import *
 import RobotModels
 from sensor_msgs.msg import JointState
-
-
-# global x_tel
-# global n
-# n = 250
-# r = 0.5
-# #twolink = RobotModels.nLink2D(Links = [1,1])
-# #YStart = np.array(np.deg2rad(YStart)).reshape(1,2)
-# #YStart = np.array(np.deg2rad([0,45])).reshape(1,2)
-
-# "Get starting joint positions (currently from launch)"
-# YStart = rospy.get_param('~YStart')
-# YStart = np.array(np.deg2rad(YStart)).reshape(1,2)
-
-# "Get current task space position"
-# jspub = rospy.Publisher('joint_states', JointState, queue_size=10)
-# cmd = JointState()
-# cmd.name = ['joint1', 'joint2'] # can this be variable from urdf?         
-# "Actuation"
-# cmd.position = [YStart[0][0], YStart[0][1]]
-# jspub.publish(cmd)   
-# data = rospy.wait_for_message('experience',Point)
-# XStart = np.array([data.x,data.y,data.z]).reshape(1,3)
-
-# #data = rospy.wait_for_message('experience',Point)
-# #XStart = np.array([data.x,data.y]).reshape(1,2)
-
-# x0 = XStart[0][0]-r
-# y0 = XStart[0][1]
-# #x0 = -0.25
-# #y0 = 1
-
-# #    trajectory = Trajectory.Star2D(n,5,r,x0,y0)
-# trajectory = Trajectory.Circle2D(n,r,x0,y0,arclength = 2*np.pi)
-# #    trajectory = Trajectory.nPoly2D(n,4,r,x0,y0)
-# #    trajectory = Trajectory.Spiral2D(n,0.6,0.1,x0,y0,6*np.pi)
-
-# # x_tel = trajectory.xtest
-# x_tel = np.column_stack((trajectory.xtest, np.zeros(np.size(trajectory.xtest,0))))
+from teleop_utils import phantom_teleop
 
 class TestTraj():
     
@@ -67,18 +29,6 @@ class TestTraj():
 
         return x,y,z        
 
-# def nextPoint(resp):
-    
-#     i = resp.i%n
-
-#     x = x_tel[i,0]
-#     y = x_tel[i,1]
-#     z = x_tel[i,2]
-#     #z = float(resp.i)
-
-#     #print([x,y])
-#     return x,y,z
-    
 def tel():
 
     rospy.init_node('Teleop_server')
@@ -116,9 +66,30 @@ def tel():
     s = rospy.Service('teleop_next',EndEffector,Test.nextPoint)    
     rospy.spin()
         
-    
+def teleop():
+    rospy.init_node('teleop_node')
+    Teleoperator = phantom_teleop.phantom_teleop()
+    R = rospy.get_param('~teleop_pub_rate', 5)
+
+    rate = rospy.Rate(R)
+
+    baxter_transform = np.asarray([
+                            [0, 0, 1],
+                            [1, 0, 0],
+                            [0, 1, 0],
+                            ])
+    Teleoperator.m_transform = baxter_transform
+    # Teleoperator.scale_mat = np.diag([1.0/160, 1.0/70, 1.0/200])
+    Teleoperator.scale_mat = 0.05 * np.diag([1, 1, 0])
+
+    while not rospy.is_shutdown():
+        Teleoperator.pub_pose.publish(Teleoperator.currentPose)
+        Teleoperator.pub_pose_next.publish(Teleoperator.nextPose)
+        Teleoperator.pub_path.publish(Teleoperator.path)
+        rate.sleep()
+
 if __name__ == '__main__':
     try:
-        tel()
+        teleop()
     except rospy.ROSInterruptException:
         pass
