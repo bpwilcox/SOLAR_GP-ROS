@@ -11,9 +11,9 @@ import RobotModels
 import osgpr_GPy
 #from Local import LocalModels
 from SOLAR_core import LocalModels
-
 from sensor_msgs.msg import JointState
-
+from teleop_utils.srv import GetPose
+from teleop_utils import phantom_teleop
 from std_msgs.msg import Int32
 from std_msgs.msg import Float64
 from bwrobot.srv import *
@@ -26,6 +26,12 @@ def teleop_client(i):
     rospy.wait_for_service('teleop_next')
     nextPoint = rospy.ServiceProxy('teleop_next',EndEffector)
     data = nextPoint(i)
+    return data
+
+def phantom_client():
+    rospy.wait_for_service('teleop_pose')
+    returnPose = rospy.ServiceProxy('teleop_pose',GetPose)
+    data = returnPose()
     return data
 
 def callback(LocMsg):
@@ -200,6 +206,7 @@ def predict():
     Loc = GetLocal()    
     Yexp = Loc.local.encode_ang(YStart)
     
+    Teleoperator = phantom_teleop.phantom_teleop()    
 #    local2 = LocalModels()
     if not wait_for_train:
         LocMsg = rospy.wait_for_message('localGP',LocalGP)
@@ -220,8 +227,14 @@ def predict():
         "Grab Teleoperator command"
         print("get teleop")
         
-        data = teleop_client(i) 
-        xnext = np.array([data.x,data.y,data.z])
+        # data = teleop_client(i) 
+        # xnext = np.array([data.x,data.y,data.z])
+        
+        # data = phantom_client() 
+        # xnext = np.array([data.pose.position.x,data.pose.position.y,data.pose.position.z])
+        data = Teleoperator.nextPose
+        xnext = np.array([data.pose.position.x,data.pose.position.y,data.pose.position.z])
+
 
         "Predict "
         if Loc.encode_angles:

@@ -207,13 +207,11 @@ def train():
         
         if i % d == 0:
             ndrift = 10
-            # mdrift = local.doOSGPR(Xtot[-d:], Ytot[-d:], local.mdrift,local.num_inducing ,use_old_Z=False, driftZ = False)
-            # W = np.diag([1/(mdrift.kern.lengthscale[0]**2), 1/(mdrift.kern.lengthscale[1]**2)])  
-            # local.W = W
-            # local.mdrift = mdrift
+            mdrift = local.doOSGPR(Xtot[-d:], Ytot[-d:], local.mdrift,local.num_inducing ,use_old_Z=False, driftZ = False)
+            W = np.diag([1/(mdrift.kern.lengthscale[0]**2), 1/(mdrift.kern.lengthscale[1]**2)])  
 
-            mdrift = GPy.models.GPRegression(Xtot[-ndrift:], Ytot[-ndrift:], GPy.kern.RBF(local.xdim,ARD=True))
-            mdrift.optimize(messages = False)
+            # mdrift = GPy.models.GPRegression(Xtot[-ndrift:], Ytot[-ndrift:], GPy.kern.RBF(local.xdim,ARD=True))
+            # mdrift.optimize(messages = False)
             
             mkl = []
             for j in range(0, local.xdim):

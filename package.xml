@@ -58,7 +58,8 @@
   <build_depend>rviz</build_depend>
   <build_depend>urdf</build_depend>
   <build_depend>python-numpy</build_depend>  
-  
+  <build_depend>teleop_utils</build_depend>  
+
   
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>rospy</build_export_depend>
@@ -74,6 +75,7 @@
   <exec_depend>rviz</exec_depend>
   <exec_depend>urdf</exec_depend>
   <exec_depend>python-numpy</exec_depend>
+  <exec_depend>teleop_utils</exec_depend>
   
   <!-- The export tag contains other, unspecified, tags -->
   <export>

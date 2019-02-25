@@ -9,13 +9,14 @@ project(bwrobot)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   joint_state_publisher
-  robot_state_publisher  
+  robot_state_publisher
   roscpp
   rospy
   std_msgs
   message_generation
   rviz
   urdf
+  teleop_utils
 )
 
 ## System dependencies are found with CMake's conventions
@@ -116,7 +117,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES bwrobot
-  CATKIN_DEPENDS roscpp rospy std_msgs message_runtime 
+  CATKIN_DEPENDS roscpp rospy std_msgs message_runtime teleop_utils
 #  DEPENDS system_lib
 )
 
