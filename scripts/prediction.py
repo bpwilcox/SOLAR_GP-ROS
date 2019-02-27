@@ -205,7 +205,7 @@ def predict():
     i = 0
     Loc = GetLocal()    
     Yexp = Loc.local.encode_ang(YStart)
-    
+    Yexp = []
     # Teleoperator = phantom_teleop.phantom_teleop()    
 #    local2 = LocalModels()
     if not wait_for_train:

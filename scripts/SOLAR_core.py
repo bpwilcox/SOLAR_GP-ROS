@@ -394,7 +394,10 @@ class LocalModels():
 #                    dw[k] = np.dot(yploc[k]-Y_prev[-1].reshape(1,self.ndim),np.transpose(yploc[k]-Y_prev[-1].reshape(1,self.ndim)))
 #                    dw[k] = np.linalg.norm(circstats.difference(yploc[k],Y_prev))
 #                    dc[k] = np.dot(yploc[k]-d,np.transpose(yploc[k]-d))
-                    dcw[k] = np.dot(d-Y_prev[-1].reshape(1,self.ndim),np.transpose(d-Y_prev[-1].reshape(1,self.ndim)))
+                    if Y_prev == []:
+                        pass
+                    else:
+                        dcw[k] = np.dot(d-Y_prev[-1].reshape(1,self.ndim),np.transpose(d-Y_prev[-1].reshape(1,self.ndim)))
                 except:
 
                     w[k] = 0
@@ -414,7 +417,11 @@ class LocalModels():
 
             self.w = w
             s = 50
-            wv = w*np.exp(-s*dcw)/var
+            if Y_prev == []:
+                wv = w/var
+            else:
+                wv = w*np.exp(-s*dcw)/var
+
             #wv = w
             #wv = w*np.exp(-s*dcw*var)
             #wv = w*np.exp(-var)

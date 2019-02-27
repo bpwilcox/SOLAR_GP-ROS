@@ -1,0 +1,46 @@
+<launch>
+
+  <arg name="pos_pub_rate" default="100" />
+  <arg name="base_frame" default ="base" />
+  <arg name="final_frame" default ="right_gripper" />
+  <arg name="jit_init" default ="100" />
+  <arg name="deg" default ="3" />
+
+  <arg name="joint_names" default ="[right_s0, right_s1, right_e1, right_w1]" />
+  <arg name="joint_init" default ="[0, 0, 0, 0]" />
+
+  <arg name="tr_pub_rate" default="100" />
+  <arg name="num_ind" default ="25" />
+  <arg name="w_thresh" default ="0.95" />
+  <arg name="drift_num" default ="1" />
+
+  <arg name="tf_pub_rate" default="100" />
+
+
+  <node name="sensor_node" pkg="bwrobot" type="sensing.py">
+  	<param name="tf_ee_pub_rate" value="$(arg pos_pub_rate)" />
+  	<param name="tf_base_frame" value="$(arg base_frame)" />
+  	<param name="tf_final_frame" value="$(arg final_frame)" />
+  </node>
+
+  <node name="train_node" pkg="bwrobot" type="trainer.py">
+  	<param name="train_pub_rate" value="$(arg tr_pub_rate)" />
+  	<rosparam param ="YStart" subst_value="True">$(arg joint_init)</rosparam>
+  	<rosparam param ="joints" subst_value="True">$(arg joint_names)</rosparam>
+	<param name="njit" value="$(arg jit_init)" />
+	<param name="degree" value="$(arg deg)" />
+	<param name="num_inducing" value="$(arg num_ind)" />
+	<param name="wgen" value="$(arg w_thresh)" />
+	<param name="drift" value="$(arg drift_num)" />
+  </node>
+
+  <node name="jitter_node" pkg="bwrobot" type="jitter.py">
+  	<rosparam param ="joints" subst_value="True">$(arg joint_names)</rosparam>
+  </node>
+
+  <node name="actuator_node" pkg="bwrobot" type="baxter_actuate.py">
+  	<param name="controller_pub_rate" value="$(arg tf_pub_rate)" />
+  	<rosparam param ="joints" subst_value="True">$(arg joint_names)</rosparam>
+  </node>
+
+</launch>

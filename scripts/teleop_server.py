@@ -79,8 +79,9 @@ def teleop():
                             [0, 1, 0],
                             ])
     Teleoperator.m_transform = baxter_transform
-    # Teleoperator.scale_mat = np.diag([1.0/160, 1.0/70, 1.0/200])
-    Teleoperator.scale_mat = 0.05 * np.diag([1, 1, 0])
+    scale = rospy.get_param('~scale', [1.0/160, 1.0/70, 1.0/200])
+
+    Teleoperator.scale_mat = np.diag(scale)
 
     while not rospy.is_shutdown():
         Teleoperator.pub_pose.publish(Teleoperator.currentPose)

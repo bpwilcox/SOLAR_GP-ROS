@@ -8,7 +8,6 @@ import time
 import Trajectory
 from TestData import TestTrajectory
 import RobotModels
-#from Local import LocalModels
 from SOLAR_core import LocalModels
 
 from sensor_msgs.msg import JointState
@@ -17,43 +16,50 @@ from std_msgs.msg import Int32
 from std_msgs.msg import Float64
 from bwrobot.srv import *
 from bwrobot.msg import *
+   
+def jitter(n, Y_init, deg = 5):
+    max_rough=0.0174533
+    pert = deg*max_rough * np.random.uniform(-1.,1.,(n,np.size(Y_init,1)))
+    Y_start = Y_init + pert
+    return Y_start
 
+def initialize():
 
+    cmd = JointState()
+    jspub = rospy.Publisher('joint_states', JointState, queue_size=10)
 
-def callback(data):
-    print(data)
-    Xexp = np.array([data.x,data.y])    
-    
-def initialize(rate,jspub,cmd,GPpub):
-    
+    all_joint_names = ['head_pan', 'right_s0', 'right_s1', 'right_e0', 'right_e1', 'right_w0', 'right_w1', 'right_w2', 'left_s0',
+    'left_s1', 'left_e0', 'left_e1', 'left_w0', 'left_w1', 'left_w2', 'l_gripper_l_finger_joint',
+    'l_gripper_r_finger_joint', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint']
+    position = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    cmd.name = all_joint_names
 
-    
-    njit = rospy.get_param('~njit')
+    "Robot settings"
+    joint_names = rospy.get_param('~joints', ['right_s0', 'right_s1', 'right_e1', 'right_w1'])
+    num_joints = len(joint_names)
     YStart = rospy.get_param('~YStart')
-#    rospy.loginfo(YStart)
-    YStart = np.array(YStart).reshape(1,2)
-    num_inducing = rospy.get_param('~num_inducing')
-    w_gen = rospy.get_param('~wgen')
-    d = rospy.get_param('~drift')
-    
-    local = LocalModels(num_inducing, wgen = w_gen, drift = d, ndim = 2)
-    YI = local.jitROS(njit,YStart)   
-    print(YI)
-    XI = np.empty([0,2])
-    for y in YI:
-        #cmd.position = [y[0], y[1]]
-        cmd.position = y.tolist()
+    YStart = np.array(np.deg2rad(YStart)).reshape(1,num_joints)
+    ind = []
+    for joint in joint_names:
+        ind.append(all_joint_names.index(joint))
+
+    "Initialize Local Models"
+    njit = rospy.get_param('~njit')
+    deg = rospy.get_param('~degree', 5)
+
+    YI = jitter(njit, YStart, deg)
+    XI = np.empty([0,3])
+    rospy.Rate(1).sleep()
+    for y in YI:        
+        cmd.header.stamp = rospy.Time.now()
+        for counter, index in enumerate(ind):
+            position[index] = y[counter]
+        cmd.position = position
         jspub.publish(cmd)
+        rospy.Rate(5).sleep()
         data = rospy.wait_for_message('experience',Point)
-        XI = np.vstack((XI,np.array([data.x,data.y]).reshape(1,2)))       
-        rate.sleep()
-    
-    local.initROS(XI,YI) 
-    
-    LocMsg = constructMsg(local)
-    GPpub.publish(LocMsg)
-    
-    return local
+        XI = np.vstack((XI,np.array([data.x,data.y, data.z]).reshape(1,3)))
+    return XI, YI, ind
 
 def constructMsg(local):
        
@@ -142,44 +148,58 @@ def train():
     rate = rospy.Rate(R)
     traintime = rospy.Publisher('traintime', Float64, queue_size=10)
     jspub = rospy.Publisher('joint_states', JointState, queue_size=10)
-    GPpub = rospy.Publisher('localGP',LocalGP,queue_size=10)
-    num_joints = rospy.get_param('~num_joints')
+    GPpub = rospy.Publisher('localGP',LocalGP,queue_size=10, latch = True)
 
-    cmd = JointState()
-    # cmd.name = ['joint1', 'joint2'] 
-    for i in range(0, num_joints):
-        cmd.name.append('joint' + str(i+1))
-
-    "Initialize Local Models"
-    njit = rospy.get_param('~njit')
-    YStart = rospy.get_param('~YStart')
-    YStart = np.array(np.deg2rad(YStart)).reshape(1,num_joints)
+    "Model Parameters"
     num_inducing = rospy.get_param('~num_inducing')
     w_gen = rospy.get_param('~wgen')
     d = rospy.get_param('~drift')
-    
-    local = LocalModels(num_inducing, wgen = w_gen, xdim =3, ndim = num_joints*2)
-    YI = local.jitY(njit,YStart)   
-    XI = np.empty([0,3])
-    j = 0
-    rospy.Rate(0.5).sleep()
-    for y in YI:        
-        cmd.header.stamp = rospy.Time.now()
-        # cmd.position = [y[0], y[1]]
-        cmd.position = y.tolist()
-        jspub.publish(cmd)
-        rospy.Rate(5).sleep()
-        data = rospy.wait_for_message('experience',Point)
-        XI = np.vstack((XI,np.array([data.x,data.y, data.z]).reshape(1,3)))          
-        j +=1
 
+    # cmd = JointState()
+
+    # all_joint_names = ['head_pan', 'right_s0', 'right_s1', 'right_e0', 'right_e1', 'right_w0', 'right_w1', 'right_w2', 'left_s0',
+    # 'left_s1', 'left_e0', 'left_e1', 'left_w0', 'left_w1', 'left_w2', 'l_gripper_l_finger_joint',
+    # 'l_gripper_r_finger_joint', 'r_gripper_l_finger_joint', 'r_gripper_r_finger_joint']
+    # position = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    # cmd.name = all_joint_names
+
+    # "Robot settings"
+    # joint_names = rospy.get_param('~joints', ['right_s0', 'right_s1', 'right_e1', 'right_w1'])
+    # num_joints = len(joint_names)
+    # YStart = rospy.get_param('~YStart')
+    # YStart = np.array(np.deg2rad(YStart)).reshape(1,num_joints)
+    # ind = []
+    # for joint in joint_names:
+    #     ind.append(all_joint_names.index(joint))
+
+    # "Initialize Local Models"
+    # njit = rospy.get_param('~njit')
+    # YI = jitter(njit, YStart, 5)
+    # XI = np.empty([0,3])
+    # rospy.Rate(1).sleep()
+    # for y in YI:        
+    #     cmd.header.stamp = rospy.Time.now()
+    #     for counter, index in enumerate(ind):
+    #         position[index] = y[counter]
+    #     cmd.position = position
+    #     jspub.publish(cmd)
+    #     rospy.Rate(5).sleep()
+    #     data = rospy.wait_for_message('experience',Point)
+    #     XI = np.vstack((XI,np.array([data.x,data.y, data.z]).reshape(1,3)))
+
+
+    "Initialize"
+    XI,YI, ind = initialize()
+    num_joints = np.size(YI,1)
+    local = LocalModels(num_inducing, wgen = w_gen, xdim =3, ndim = num_joints*2)
     local.initializeF(XI,YI)
+
     LocMsg = constructMsg(local)
     GPpub.publish(LocMsg)
     
     Xtot = local.XI
     Ytot = local.YI
-
+    Y = np.empty([1,num_joints])
     i = 1
     
     "Main Loop"
@@ -187,8 +207,10 @@ def train():
 
         "Get Yexp"
         data = rospy.wait_for_message('joint_states',JointState) # should I use this vs prediction?
+        for counter, index in enumerate(ind):
+            Y[0,counter] = data.position[index]
         
-        Y = np.array(data.position).reshape(1,num_joints)        
+        # Y = np.array(data.position).reshape(1,num_joints)      
         Yexp = local.encode_ang(Y)
 
         "Get Xexp"

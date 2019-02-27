@@ -69,6 +69,7 @@ add_message_files(
 add_service_files(
   FILES
   EndEffector.srv
+	Jitter.srv
 )
 
 ## Generate actions in the 'action' folder

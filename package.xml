@@ -59,7 +59,8 @@
   <build_depend>urdf</build_depend>
   <build_depend>python-numpy</build_depend>  
   <build_depend>teleop_utils</build_depend>  
-
+  <build_depend>baxter_description</build_depend>
+	<exec_depend>baxter_description</exec_depend>
   
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>rospy</build_export_depend>
