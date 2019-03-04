@@ -1,0 +1,22 @@
+<launch>
+
+  <arg name="js_pub_rate" default="1" />
+  <arg name="tel_pub_rate" default="100" />
+  <arg name="sequential" default="false" />
+  <arg name="scaling" default="[0.015, 0.015, 0.015]" />
+
+  <node name="teleop_node" pkg="bwrobot" type="teleop_server.py">
+  	<param name="teleop_pub_rate" value="$(arg tel_pub_rate)" />
+  	<rosparam param ="scale" subst_value="True">$(arg scaling)</rosparam>
+  </node>
+
+  <node pkg="tf" type="static_transform_publisher" name="telop_tf"
+		args="0 0 0 0 0 0 base phantom 100" />
+
+  <node name="predict_node" pkg="bwrobot" type="baxter_predict.py">
+  	<param name="predict_pub_rate" value="$(arg js_pub_rate)" />
+  	<param name="wait_for_train" value="$(arg sequential)" />
+  	<rosparam param ="scale" subst_value="True">$(arg scaling)</rosparam>
+  </node>
+
+</launch>

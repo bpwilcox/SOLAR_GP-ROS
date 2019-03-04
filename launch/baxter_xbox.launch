@@ -1,0 +1,27 @@
+<launch>
+
+  <arg name="js_pub_rate" default="1" />
+  <arg name="tel_pub_rate" default="100" />
+  <arg name="sequential" default="false" />
+  <arg name="dev" default="/dev/input/js0" />
+
+  <node pkg="joy" type="joy_node" name="joy">
+    <param name="dev" value="$(arg dev)" /> 
+    <param name="deadzone" value="0.2" />
+    <param name="autorepeat_rate" value="40" />
+    <param name="coalesce_interval" value="0.025" />
+  </node>
+
+  <node name="xbox_teleop_node" pkg="bwrobot" type="xbox_server.py">
+  	<param name="teleop_pub_rate" value="$(arg tel_pub_rate)" />
+  </node>
+
+  <node pkg="tf" type="static_transform_publisher" name="telop_tf"
+		args="0 0 0 0 0 0 base xbox 100" />
+
+  <node name="predict_node" pkg="bwrobot" type="baxter_predict_xbox.py">
+  	<param name="predict_pub_rate" value="$(arg js_pub_rate)" />
+  	<param name="wait_for_train" value="$(arg sequential)" />
+  </node>
+
+</launch>

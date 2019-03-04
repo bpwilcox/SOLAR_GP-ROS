@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
   rviz
   urdf
   teleop_utils
+  baxter_interface
 )
 
 ## System dependencies are found with CMake's conventions

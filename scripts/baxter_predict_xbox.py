@@ -12,7 +12,7 @@ import osgpr_GPy
 from SOLAR_core import LocalModels
 from sensor_msgs.msg import JointState
 from teleop_utils.srv import GetPose
-from teleop_utils import phantom_teleop
+from teleop_utils import xbox_teleop
 from std_msgs.msg import Float64
 from bwrobot.srv import *
 from bwrobot.msg import *
@@ -203,16 +203,7 @@ def predict():
     Loc = GetLocal()
     Yexp = []
     
-    Teleoperator = phantom_teleop.phantom_teleop() 
-    baxter_transform = np.asarray([
-                            [0, 0, 1],
-                            [1, 0, 0],
-                            [0, 1, 0],
-                            ])
-    Teleoperator.m_transform = baxter_transform
-    scale = rospy.get_param('~scale', [1.0/160, 1.0/70, 1.0/200])
-    Teleoperator.scale_mat = np.diag(scale)
-
+    Teleoperator = xbox_teleop.XboxTel() 
 
     if not wait_for_train:
         LocMsg = rospy.wait_for_message('localGP',LocalGP)
@@ -234,10 +225,7 @@ def predict():
             rospy.Subscriber('localGP',LocalGP,Loc.callback)
 
         "Grab Teleoperator command"
-           
-        # data = phantom_client() 
-        # xnext = np.array([data.pose.pose.position.x,data.pose.pose.position.y,data.pose.pose.position.z])
-        
+                   
         if not Teleoperator.button2:
             continue
 

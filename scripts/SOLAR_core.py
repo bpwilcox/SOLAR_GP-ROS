@@ -2,6 +2,7 @@ import numpy as np
 import GPy
 import osgpr_GPy
 import circstats
+from copy import copy, deepcopy
 class LocalModels():
 
 
@@ -134,7 +135,7 @@ class LocalModels():
                          #m.likelihood.variance = self.mdrift.likelihood.variance
                          #m.kern.variance =  self.mdrift.kern.variance
                          #m.kern.lengthscale =  self.mdrift.kern.lengthscale
-                        self.Models[j]  = m
+                        self.Models[j]  = deepcopy(m)
                         self.Z[j] = m.Z
                         self.UpdateX[j] = None
                         self.UpdateY[j] = None
@@ -142,8 +143,8 @@ class LocalModels():
 
                 else:
                     print("Add New Model")
-                    m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j-1], self.num_inducing, fixTheta = False, driftZ = False,use_old_Z=True)
-                    #m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.mdrift, self.num_inducing, fixTheta = False, driftZ = False,use_old_Z=True)
+                    #m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j-1], self.num_inducing, fixTheta = False, driftZ = False,use_old_Z=True)
+                    m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.mdrift, self.num_inducing, fixTheta = False, driftZ = False,use_old_Z=True)
 
                     self.Models.append(m)
                     self.LocalData[j][4] = True
@@ -313,7 +314,7 @@ class LocalModels():
 
     def doOSGPR(self,X,Y,m_old, num_inducing,use_old_Z=True, driftZ = False, fixTheta = False):
 
-        Zopt = m_old.Z.param_array
+        Zopt = copy(m_old.Z.param_array)
         mu, Su = m_old.predict(Zopt, full_cov = True)
         Su = Su + 1e-4*np.eye(mu.shape[0])
 
@@ -324,9 +325,9 @@ class LocalModels():
         m_new = osgpr_GPy.OSGPR_VFE(X, Y, m_old.kern, mu, Su, Kaa,
             Zopt, Zinit)
 
-        m_new.likelihood.variance = m_old.likelihood.variance
-        m_new.kern.variance = m_old.kern.variance
-        m_new.kern.lengthscale = m_old.kern.lengthscale
+        m_new.likelihood.variance = copy(m_old.likelihood.variance)
+        m_new.kern.variance = copy(m_old.kern.variance)
+        m_new.kern.lengthscale = copy(m_old.kern.lengthscale)
 
 
         "Fix parameters"
@@ -416,7 +417,7 @@ class LocalModels():
                 h = 1
 
             self.w = w
-            s = 50
+            s = 1
             if Y_prev == []:
                 wv = w/var
             else:
