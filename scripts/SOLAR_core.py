@@ -417,12 +417,12 @@ class LocalModels():
                 h = 1
 
             self.w = w
-            s = 1
+            s = 0
             if Y_prev == []:
                 wv = w/var
             else:
                 wv = w*np.exp(-s*dcw)/var
-
+                # wv = w*np.exp(-var)
             #wv = w
             #wv = w*np.exp(-s*dcw*var)
             #wv = w*np.exp(-var)
