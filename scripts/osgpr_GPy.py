@@ -118,7 +118,7 @@ class OSGPR_VFE(GP):
         Lbinv_Kbf = sp.linalg.solve_triangular(Lb, Kbf, lower=True) / sigma
         d1 = np.matmul(Lbinv_Kbf, np.transpose(Lbinv_Kbf))
 
-        LSa = np.linalg.cholesky(Saa)
+        LSa = np.linalg.cholesky(Saa) 
         Kab_Lbinv = np.transpose(Lbinv_Kba)
         LSainv_Kab_Lbinv = sp.linalg.solve_triangular(
             LSa, Kab_Lbinv, lower=True)

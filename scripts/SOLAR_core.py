@@ -21,7 +21,6 @@ class LocalModels():
         self.LocalData = [] # Local model partition data
         self.M = len(self.LocalData) #number of models
         self.num_inducing = num_inducing # number of inducing support points
-        self.Z = [] # Support points
         self.drift = drift
         self.mdrift = mdrift # drifting GP
         self.robot= robot # robot model
@@ -65,7 +64,6 @@ class LocalModels():
             mkl.append(1/(m.kern.lengthscale[i]**2))
         W = np.diag(mkl)
 
-        self.Z.append(m.Z)
         self.W = W
         self.Ws.append(W)
         self.Models.append(m)
@@ -104,7 +102,6 @@ class LocalModels():
             mkl.append(1/(m.kern.lengthscale[i]**2))
         W = np.diag(mkl)
 
-        self.Z.append(m.Z)
         self.W = W
         self.Ws.append(W)
         self.Models.append(m)
@@ -130,13 +127,13 @@ class LocalModels():
                     if np.any(self.UpdateX[j]==None):
                         continue
                     else:
-                        m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j], self.num_inducing, fixTheta = False,use_old_Z=True)
+#                        m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j], self.num_inducing, fixTheta = False,use_old_Z=False)
 
                          #m.likelihood.variance = self.mdrift.likelihood.variance
                          #m.kern.variance =  self.mdrift.kern.variance
                          #m.kern.lengthscale =  self.mdrift.kern.lengthscale
-                        self.Models[j]  = deepcopy(m)
-                        self.Z[j] = m.Z
+                        self.Models[j]  = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j], self.num_inducing, fixTheta = False,use_old_Z=False)
+#                        self.Models[j] = deepcopy(m)
                         self.UpdateX[j] = None
                         self.UpdateY[j] = None
 
@@ -144,11 +141,10 @@ class LocalModels():
                 else:
                     print("Add New Model")
                     #m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j-1], self.num_inducing, fixTheta = False, driftZ = False,use_old_Z=True)
-                    m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.mdrift, self.num_inducing, fixTheta = False, driftZ = False,use_old_Z=True)
+                    m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.mdrift, self.num_inducing, fixTheta = False, driftZ = False,use_old_Z=False)
 
                     self.Models.append(m)
                     self.LocalData[j][4] = True
-                    self.Z.append(m.Z)
                     self.UpdateX[j] = None
                     self.UpdateY[j] = None
 
@@ -187,6 +183,7 @@ class LocalModels():
 
     def train_init(self,X, Y, num_inducing):
 #        print("initialize first sparse model...")
+        
         if len(X) < num_inducing:
             num_inducing = len(X)
         Z = X[np.random.permutation(X.shape[0])[0:num_inducing], :]
@@ -210,21 +207,20 @@ class LocalModels():
 
                 for k in range(0,M,1):
                     c = M_loc[k][2] #1x2
-                    d = self.LocalData[k][3]
-
                     xW = np.dot((xnew[n]-c),W) # 1x2 X 2x2
+#                    print('xW: ', xW)
+#                    print('W: ', W)
+
                     w[k] = np.exp(-0.5*np.dot(xW,np.transpose((xnew[n]-c))))
+#                    print('w[k]: ', w[k])
+#                    print('xnew: ',xnew[n])
+#                    print('c: ', c)
                     #dcw[k] = np.dot(d-ynew[n],np.transpose(d-ynew[n]))
 
 
-                if useJointdist:
-                #if self.encode:
-                    #wv = w*np.exp(-0.5*dcw)
-                    wv = w
-                else:
-                    wv = w
-                wnear = np.max(wv)
-                near = np.argmax(wv)
+                wnear = np.max(w)
+                print('wnear: ', wnear)
+                near = np.argmax(w)
 
                 if wnear > self.wgen:
 
@@ -301,11 +297,14 @@ class LocalModels():
             Z = np.delete(old_Z, np.arange(0,M_new),axis = 0)
         elif use_old_Z:
             Z = np.copy(cur_Z)
-
+            
+        elif M < new_X.shape[0]:
+            stack = np.vstack((cur_Z,new_X))
+            Z =  stack[np.random.permutation(stack.shape[0])[0:M], :]
         else:
             M = cur_Z.shape[0]
-            #M_old = int(0.7 * M)
-            M_old = M - len(new_X)
+            M_old = int(0.7 * M)
+#            M_old = M - len(new_X)
             M_new = M - M_old
             old_Z = cur_Z[np.random.permutation(M)[0:M_old], :]
             new_Z = new_X[np.random.permutation(new_X.shape[0])[0:M_new], :]
@@ -314,20 +313,21 @@ class LocalModels():
 
     def doOSGPR(self,X,Y,m_old, num_inducing,use_old_Z=True, driftZ = False, fixTheta = False):
 
-        Zopt = copy(m_old.Z.param_array)
+        Zopt = m_old.Z.param_array[:]
         mu, Su = m_old.predict(Zopt, full_cov = True)
         Su = Su + 1e-4*np.eye(mu.shape[0])
 
         Kaa = m_old.kern.K(Zopt)
-
+        
+        kern = GPy.kern.RBF(self.xdim,ARD=True)
+        
         Zinit = self.init_Z(Zopt, X, num_inducing, use_old_Z, driftZ)
-
-        m_new = osgpr_GPy.OSGPR_VFE(X, Y, m_old.kern, mu, Su, Kaa,
+        m_new = osgpr_GPy.OSGPR_VFE(X, Y, kern, mu, Su, Kaa,
             Zopt, Zinit)
 
-        m_new.likelihood.variance = copy(m_old.likelihood.variance)
-        m_new.kern.variance = copy(m_old.kern.variance)
-        m_new.kern.lengthscale = copy(m_old.kern.lengthscale)
+        m_new.likelihood.variance = m_old.likelihood.variance[:]
+        m_new.kern.variance = m_old.kern.variance[:]
+        m_new.kern.lengthscale = m_old.kern.lengthscale[:]
 
 
         "Fix parameters"
