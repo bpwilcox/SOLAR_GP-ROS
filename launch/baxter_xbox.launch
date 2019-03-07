@@ -1,6 +1,6 @@
 <launch>
 
-  <arg name="js_pub_rate" default="1" />
+  <arg name="js_pub_rate" default="50" />
   <arg name="tel_pub_rate" default="100" />
   <arg name="sequential" default="false" />
   <arg name="dev" default="/dev/input/js0" />
@@ -23,5 +23,10 @@
   	<param name="predict_pub_rate" value="$(arg js_pub_rate)" />
   	<param name="wait_for_train" value="$(arg sequential)" />
   </node>
+
+<!--
+ <node name="actuator_node" pkg="bwrobot" type="baxter_control.py">
+  </node>
+-->
 
 </launch>

@@ -130,7 +130,7 @@ class LocalModels():
                     if np.any(self.UpdateX[j]==None):
                         continue
                     else:
-                        m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j], self.num_inducing, fixTheta = False,use_old_Z=True)
+                        m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j], self.num_inducing, fixTheta = False,use_old_Z=False)
 
                          #m.likelihood.variance = self.mdrift.likelihood.variance
                          #m.kern.variance =  self.mdrift.kern.variance
@@ -144,7 +144,7 @@ class LocalModels():
                 else:
                     print("Add New Model")
                     #m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j-1], self.num_inducing, fixTheta = False, driftZ = False,use_old_Z=True)
-                    m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.mdrift, self.num_inducing, fixTheta = False, driftZ = False,use_old_Z=True)
+                    m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.mdrift, self.num_inducing, fixTheta = False, driftZ = False,use_old_Z=False)
 
                     self.Models.append(m)
                     self.LocalData[j][4] = True

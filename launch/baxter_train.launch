@@ -9,6 +9,10 @@
   <arg name="w_thresh" default ="0.975" />
   <arg name="drift_num" default ="1" />
 
+  <node name="jitter_node" pkg="bwrobot" type="baxter_jitter.py">
+  	<rosparam param ="joints" subst_value="True">$(arg joint_names)</rosparam>
+  </node>
+
   <node name="train_node" pkg="bwrobot" type="baxter_train.py">
   	<param name="train_pub_rate" value="$(arg tr_pub_rate)" />
   	<rosparam param ="YStart" subst_value="True">$(arg joint_init)</rosparam>

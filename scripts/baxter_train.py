@@ -13,7 +13,7 @@ from SOLAR_core import LocalModels
 from sensor_msgs.msg import JointState
 
 from std_msgs.msg import Float64
-from bwrobot.srv import *
+from bwrobot.srv import Jitter, MoveJoint, MoveJointRequest
 from bwrobot.msg import *
 import baxter_interface
 from data_buffer import DataBuffer
@@ -148,14 +148,35 @@ def train():
     GPpub = rospy.Publisher('localGP',LocalGP,queue_size=10, latch = True)
     x_topic = rospy.get_param('~x_topic', 'robot/limb/right/endpoint_state')
     y_topic = rospy.get_param('~y_topic', 'robot/joint_states')
-    buffer_duration = rospy.get_param('~buffer_duration', 0.2)
-    buffer_size = rospy.get_param('~buffer_size', 25)
+    buffer_duration = rospy.get_param('~buffer_duration', 0.1)
+    buffer_size = rospy.get_param('~buffer_size', 100)
     joint_names = rospy.get_param('~joints', ['right_s0', 'right_s1', 'right_e1', 'right_w1'])
-
+    njit = rospy.get_param('~njit')
+    deg = rospy.get_param('~degree', 5)
+    YStart = rospy.get_param('~YStart', [0,0,0,0])
+   
     "Model Parameters"
     num_inducing = rospy.get_param('~num_inducing')
     w_gen = rospy.get_param('~wgen')
     d = rospy.get_param('~drift')
+
+    # rospy.wait_for_service('move_joints')
+    # move_joints = rospy.ServiceProxy('move_joints', MoveJoint)
+    # start = MoveJointRequest()
+    # start.joints.position = YStart
+    # start.joints.name = joint_names
+    # start.neutral = True
+    # move_joints(start)
+
+    # TrainData = DataBuffer(x_topic, y_topic, joint_names, 0.5, buffer_size)
+    # rospy.wait_for_service('jitter')
+    # jitter_pos = rospy.ServiceProxy('jitter', Jitter)
+    # jitter_pos(njit, deg)
+
+    # XI = np.asarray(TrainData.Xexp).reshape(len(TrainData.Xexp),3)
+    # YI = np.asarray(TrainData.Yexp).reshape(len(TrainData.Yexp),len(joint_names))
+    # TrainData.duration = buffer_duration
+    # TrainData.clear()
 
     "Initialize"
     limb = baxter_interface.Limb('right')
@@ -171,44 +192,49 @@ def train():
     Ytot = local.YI
     i = 1
 
-    # TrainData = DataBuffer(x_topic, y_topic, joint_names, buffer_duration, buffer_size)
+    TrainData = DataBuffer(x_topic, y_topic, joint_names, buffer_duration, buffer_size)
     
     "Main Loop"
     while not rospy.is_shutdown():
 
         "Get Yexp"
         # Wait for prediction before training 
-        rospy.wait_for_message('prediction', Arrays)
-    
-        # Xexp = np.asarray(TrainData.Xexp).reshape(len(TrainData.Xexp),3)
-        # Yexp = np.asarray(TrainData.Yexp).reshape(len(TrainData.Yexp),num_joints)
+        # rospy.wait_for_message('prediction', Arrays)
+        if not TrainData.Xexp:
+            continue
+        else:
+            Xexp = np.asarray(TrainData.Xexp).reshape(len(TrainData.Xexp),3)
+            Y = np.asarray(TrainData.Yexp).reshape(len(TrainData.Yexp),num_joints)
+            Yexp = local.encode_ang(Y)
 
-        Y = []
-        for joint in joint_names:
-            Y.append(limb.joint_angle(joint))
+        TrainData.clear()
         
-        Y = np.array(Y).reshape(1,num_joints)      
-        Yexp = local.encode_ang(Y)
+        # Y = []
+        # for joint in joint_names:
+        #     Y.append(limb.joint_angle(joint))
+        
+        # Y = np.array(Y).reshape(1,num_joints)      
+        # Yexp = local.encode_ang(Y)
 
-        "Get Xexp"
-        end_pose = limb.endpoint_pose()
-        Xexp = np.array([end_pose['position'].x, end_pose['position'].y, end_pose['position'].z]).reshape(1,3)
+        # "Get Xexp"
+        # end_pose = limb.endpoint_pose()
+        # Xexp = np.array([end_pose['position'].x, end_pose['position'].y, end_pose['position'].z]).reshape(1,3)
 
-        "Training"
-        if Xtot.shape[0] > 50:
-            Xtot = np.delete(Xtot,0,0)
-            Ytot = np.delete(Ytot,0,0)
+        # "Training"
+        # if Xtot.shape[0] > 50:
+        #     Xtot = np.delete(Xtot,0,0)
+        #     Ytot = np.delete(Ytot,0,0)
             
-        Xtot = np.vstack((Xtot,Xexp))
-        Ytot = np.vstack((Ytot,Yexp))
+        # Xtot = np.vstack((Xtot,Xexp))
+        # Ytot = np.vstack((Ytot,Yexp))
 
         t1 = time.time()
         
         if i % d == 0:
             ndrift = 10
-            mdrift = local.doOSGPR(Xtot[-d:], Ytot[-d:], local.mdrift,local.num_inducing ,use_old_Z=False, driftZ = False)
-            # mdrift = local.doOSGPR(Xexp, Yexp, local.mdrift,local.num_inducing ,use_old_Z=False, driftZ = False)
-            W = np.diag([1/(mdrift.kern.lengthscale[0]**2), 1/(mdrift.kern.lengthscale[1]**2)])  
+            # mdrift = local.doOSGPR(Xtot[-d:], Ytot[-d:], local.mdrift,local.num_inducing ,use_old_Z=False, driftZ = False)
+            mdrift = local.doOSGPR(Xexp, Yexp, local.mdrift,local.num_inducing ,use_old_Z=False, driftZ = False)
+            # W = np.diag([1/(mdrift.kern.lengthscale[0]**2), 1/(mdrift.kern.lengthscale[1]**2)])  
 
             # mdrift = GPy.models.GPRegression(Xtot[-ndrift:], Ytot[-ndrift:], GPy.kern.RBF(local.xdim,ARD=True))
             # mdrift.optimize(messages = False)

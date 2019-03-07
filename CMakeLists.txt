@@ -71,6 +71,9 @@ add_service_files(
   FILES
   EndEffector.srv
 	Jitter.srv
+  SaveToFile.srv
+  MoveJoint.srv
+  SetNeutral.srv
 )
 
 ## Generate actions in the 'action' folder
@@ -85,6 +88,7 @@ generate_messages(
   DEPENDENCIES
   std_msgs
   geometry_msgs
+  sensor_msgs
 )
 
 ################################################

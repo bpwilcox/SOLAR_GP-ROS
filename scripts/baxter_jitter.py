@@ -6,7 +6,7 @@ import numpy as np
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Point
 from bwrobot.msg import Arrays
-from bwrobot.srv import Jitter
+from bwrobot.srv import Jitter, MoveJoint, SetNeutral
 from copy import deepcopy, copy
 import baxter_interface
 
@@ -18,6 +18,8 @@ class JitRobot():
         self.joint_names = names
         self.jit_service= rospy.Service('jitter',Jitter, self.jitter)
         self.prediction = rospy.Publisher('prediction', Arrays, queue_size=10)
+        self.start_service = rospy.Service('move_joints',MoveJoint, self.move_joints)
+        self.neutral_service = rospy.Service('set_neutral',SetNeutral, self.set_neutral)
 
     def jitter(self, req):
 
@@ -31,10 +33,20 @@ class JitRobot():
 
         for y in YI:        
             self.limb.move_to_joint_positions(dict(zip(self.joint_names,y.tolist())))
-            self.prediction.publish(y.tolist())
+            # self.prediction.publish(y.tolist())
 
         return True
 
+    def move_joints(self, req):
+        if req.neutral:
+            self.limb.move_to_neutral()
+        else:
+            self.limb.move_to_joint_positions(dict(zip(req.joints.name, req.joints.position)))  
+        return True
+
+    def set_neutral(self, req):
+        self.limb.move_to_neutral()
+        return True
 
 def jitter_server():
 
@@ -43,7 +55,7 @@ def jitter_server():
     "Robot settings"
     joint_names = rospy.get_param('~joints', ['right_s0', 'right_s1', 'right_e1', 'right_w1'])
     limb = baxter_interface.Limb('right')
-    limb.set_joint_position_speed(1.0)
+    # limb.set_joint_position_speed(1.0)
     RobotState = JitRobot(limb, joint_names)
 
     rospy.spin()

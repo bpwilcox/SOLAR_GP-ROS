@@ -18,6 +18,8 @@ class DataBuffer():
         self.max_buffer_size = max_buffer_size
         self.Xexp = list()
         self.Yexp = list()
+        self.y_prev = []
+        self.thresh = 0.000001
         rospy.Timer(rospy.Duration(duration), self.timer_callback)
 
     def x_callback(self, data):
@@ -28,8 +30,17 @@ class DataBuffer():
     
     def timer_callback(self, event):
         if self.x_state and self.y_state != None:
-            self.Xexp.append(self.parse_x(self.x_state))
-            self.Yexp.append(self.parse_y(self.y_state))
+            if self.y_prev == []:
+                self.Xexp.append(self.parse_x(self.x_state))
+                self.Yexp.append(self.parse_y(self.y_state))
+                self.y_prev = self.Yexp[-1]
+            else:
+                y_new = self.parse_y(self.y_state)
+                d = np.dot(y_new-self.y_prev, np.transpose(y_new-self.y_prev))
+                if d > self.thresh:
+                    self.Xexp.append(self.parse_x(self.x_state))
+                    self.Yexp.append(self.parse_y(self.y_state))
+                    self.y_prev = self.Yexp[-1]
             if len(self.Xexp) > self.max_buffer_size:
                 self.Xexp.pop(0)
                 self.Yexp.pop(0)

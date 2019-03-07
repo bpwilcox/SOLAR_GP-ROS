@@ -1,0 +1,4 @@
+sensor_msgs/JointState joints
+bool neutral
+---
+bool success
