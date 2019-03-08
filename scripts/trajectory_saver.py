@@ -12,7 +12,6 @@ class TrajectorySaver():
         rospy.Subscriber(path_topic, Path, self.path_callback, queue_size = 10)
         self.currentPath = Path()
         self.service= rospy.Service('save_trajectory',SaveToFile, self.save_callback)
-    
     def path_callback(self, msg):
         self.currentPath = msg
 
@@ -28,7 +27,7 @@ class TrajectorySaver():
 def saver():
 
     rospy.init_node('trajectory_saver_node')
-    path_topic = rospy.get_param('~path_topic', 'xbox_path')
+    path_topic = rospy.get_param('~path_topic', 'teleop_path')
     TrajectorySaver(path_topic)
     rospy.spin()
 

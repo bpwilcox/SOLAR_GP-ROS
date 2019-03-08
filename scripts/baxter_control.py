@@ -24,8 +24,9 @@ class ActRobot():
 
 
 class ControlJoints():
-    def __init__(self, limb,joint_names, topic):
+    def __init__(self, limb,joint_names, topic, filter_coef):
         self.limb = limb
+        self.coef = filter_coef
         # self.gripper = gripper
         self.joint_names = joint_names
         self.joint_angles = dict()
@@ -102,7 +103,7 @@ class ControlJoints():
             cmd = self.joint_angles
             for idx, joint in enumerate(self.joint_names):
                 # cmd[joint] = 0.012488 * self.nextY[idx] + 0.98751 * cmd[joint]
-                cmd[joint] = 0.3 * self.nextY[idx] + 0.7 * cmd[joint]
+                cmd[joint] = self.coef * self.nextY[idx] + (1-self.coef) * cmd[joint]
             return cmd
 
         def genf(joint, angle):
@@ -126,24 +127,26 @@ class ControlJoints():
 def actuate():
 
     rospy.init_node('actuator_node')
-    limb = baxter_interface.Limb('right')
-    gripper = baxter_interface.Gripper('right')
-    joint_names = rospy.get_param('~joints', ['right_s0', 'right_s1', 'right_e1', 'right_w1'])
-    y_topic = rospy.get_param('~y_topic', 'robot/joint_states')
-    # MoveRobot = ActRobot(limb, joint_names)
-    MoveRobot = ControlJoints(limb,joint_names, y_topic)
-    # limb.set_command_timeout(1)
-    limb.set_joint_position_speed(0.3)
 
-    rospy.wait_for_service('get_xbox_teleop')
-    get_teleop = rospy.ServiceProxy('get_xbox_teleop', GetTeleop)
+    arm = rospy.get_param('~arm', 'right')
+    filter_coef = rospy.get_param('~filter_coef', 0.1)
+
+    limb = baxter_interface.Limb(arm)
+    gripper = baxter_interface.Gripper(arm)
+    joints = rospy.get_param('~joints', ['s0', 's1', 'e1', 'w1'])
+    joint_names = [arm + '_' + joint for joint in joints]    
+    y_topic = rospy.get_param('~y_topic', 'robot/joint_states')
+    MoveRobot = ControlJoints(limb,joint_names, y_topic, filter_coef)
+
+    rospy.wait_for_service('get_teleop')
+    get_teleop = rospy.ServiceProxy('get_teleop', GetTeleop)
     teleop_state = GetTeleopResponse()
 
-    rospy.wait_for_service('jitter')
-    jitter_pos = rospy.ServiceProxy('jitter', Jitter)
+    # rospy.wait_for_service('jitter')
+    # jitter_pos = rospy.ServiceProxy('jitter', Jitter)
 
     rospy.wait_for_message('prediction',Arrays)
-
+    print("Ready")
     while not rospy.is_shutdown():
         # print('current: ', MoveRobot.currentY)
         # print('target: ', MoveRobot.nextY)
@@ -152,8 +155,8 @@ def actuate():
         # limb.set_joint_positions(dict(zip(joint_names, MoveRobot.nextY)))
         # limb.set_joint_positions(MoveRobot.filtered_cmd())
         teleop_state = get_teleop()
-        if teleop_state.button6:
-            jitter_pos(5,3)
+        # if teleop_state.button6:
+        #     jitter_pos(5,3)
         if teleop_state.button7:
             MoveRobot.set_neutral()
         if teleop_state.button4:

@@ -53,8 +53,11 @@ def jitter_server():
     rospy.init_node('jitter_node')
 
     "Robot settings"
-    joint_names = rospy.get_param('~joints', ['right_s0', 'right_s1', 'right_e1', 'right_w1'])
-    limb = baxter_interface.Limb('right')
+    arm = rospy.get_param('~arm', 'right')
+    limb = baxter_interface.Limb(arm)
+    joints = rospy.get_param('~joints', ['s0', 's1', 'e1', 'w1'])
+    joint_names = [arm + '_' + joint for joint in joints] 
+
     # limb.set_joint_position_speed(1.0)
     RobotState = JitRobot(limb, joint_names)
 

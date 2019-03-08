@@ -21,7 +21,7 @@ class LocalModels():
         self.LocalData = [] # Local model partition data
         self.M = len(self.LocalData) #number of models
         self.num_inducing = num_inducing # number of inducing support points
-        self.Z = [] # Support points
+        # self.Z = [] # Support points
         self.drift = drift
         self.mdrift = mdrift # drifting GP
         self.robot= robot # robot model
@@ -65,7 +65,7 @@ class LocalModels():
             mkl.append(1/(m.kern.lengthscale[i]**2))
         W = np.diag(mkl)
 
-        self.Z.append(m.Z)
+        # self.Z.append(m.Z)
         self.W = W
         self.Ws.append(W)
         self.Models.append(m)
@@ -104,7 +104,7 @@ class LocalModels():
             mkl.append(1/(m.kern.lengthscale[i]**2))
         W = np.diag(mkl)
 
-        self.Z.append(m.Z)
+        # self.Z.append(m.Z)
         self.W = W
         self.Ws.append(W)
         self.Models.append(m)
@@ -130,13 +130,13 @@ class LocalModels():
                     if np.any(self.UpdateX[j]==None):
                         continue
                     else:
-                        m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j], self.num_inducing, fixTheta = False,use_old_Z=False)
+                        # m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j], self.num_inducing, fixTheta = False,use_old_Z=False)
 
                          #m.likelihood.variance = self.mdrift.likelihood.variance
                          #m.kern.variance =  self.mdrift.kern.variance
                          #m.kern.lengthscale =  self.mdrift.kern.lengthscale
-                        self.Models[j]  = deepcopy(m)
-                        self.Z[j] = m.Z
+                        self.Models[j]  = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j], self.num_inducing, fixTheta = False,use_old_Z=False)
+                        # self.Z[j] = m.Z
                         self.UpdateX[j] = None
                         self.UpdateY[j] = None
 
@@ -148,7 +148,7 @@ class LocalModels():
 
                     self.Models.append(m)
                     self.LocalData[j][4] = True
-                    self.Z.append(m.Z)
+                    # self.Z.append(m.Z)
                     self.UpdateX[j] = None
                     self.UpdateY[j] = None
 
@@ -319,15 +319,18 @@ class LocalModels():
         Su = Su + 1e-4*np.eye(mu.shape[0])
 
         Kaa = m_old.kern.K(Zopt)
+        kern = GPy.kern.RBF(self.xdim,ARD=True)
+        kern.variance = copy(m_old.kern.variance)
+        kern.lengthscale = copy(m_old.kern.lengthscale)
 
         Zinit = self.init_Z(Zopt, X, num_inducing, use_old_Z, driftZ)
 
-        m_new = osgpr_GPy.OSGPR_VFE(X, Y, m_old.kern, mu, Su, Kaa,
+        m_new = osgpr_GPy.OSGPR_VFE(X, Y, kern, mu, Su, Kaa,
             Zopt, Zinit)
 
         m_new.likelihood.variance = copy(m_old.likelihood.variance)
-        m_new.kern.variance = copy(m_old.kern.variance)
-        m_new.kern.lengthscale = copy(m_old.kern.lengthscale)
+        # m_new.kern.variance = copy(m_old.kern.variance)
+        # m_new.kern.lengthscale = copy(m_old.kern.lengthscale)
 
 
         "Fix parameters"

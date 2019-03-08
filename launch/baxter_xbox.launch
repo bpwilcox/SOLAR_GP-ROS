@@ -1,9 +1,15 @@
 <launch>
 
-  <arg name="js_pub_rate" default="50" />
+  <arg name="js_pub_rate" default="100" />
   <arg name="tel_pub_rate" default="100" />
   <arg name="sequential" default="false" />
   <arg name="dev" default="/dev/input/js0" />
+  <arg name="which_arm" default ="right" />
+  <arg name="joint_names" default ="[s0, s1, e1, w1]" />
+  <arg name="teleop_device" default ="xbox" />
+  <arg name="bag_file" default ="/home/bpwilcox/catkin_ws/first_bag.bag" />
+  <arg name="filter_coefficient" default="0.15" />
+  <arg name="max_pred_distance" default="0.2" />
 
   <node pkg="joy" type="joy_node" name="joy">
     <param name="dev" value="$(arg dev)" /> 
@@ -12,21 +18,26 @@
     <param name="coalesce_interval" value="0.025" />
   </node>
 
-  <node name="xbox_teleop_node" pkg="bwrobot" type="xbox_server.py">
-  	<param name="teleop_pub_rate" value="$(arg tel_pub_rate)" />
-  </node>
-
   <node pkg="tf" type="static_transform_publisher" name="telop_tf"
-		args="0 0 0 0 0 0 base xbox 100" />
+		args="0 0 0 0 0 0 base teleop 100" />
 
-  <node name="predict_node" pkg="bwrobot" type="baxter_predict_xbox.py">
+  <node name="predict_node" pkg="bwrobot" type="baxter_predict_teleop.py">
   	<param name="predict_pub_rate" value="$(arg js_pub_rate)" />
   	<param name="wait_for_train" value="$(arg sequential)" />
+	<param name="arm" value="$(arg which_arm)" />
+	<param name="max_distance" value="$(arg max_pred_distance)" />
   </node>
 
-<!--
- <node name="actuator_node" pkg="bwrobot" type="baxter_control.py">
+  <node name="control_node" pkg="bwrobot" type="baxter_control.py">
+  	<rosparam param ="joints" subst_value="True">$(arg joint_names)</rosparam>
+	<param name="arm" value="$(arg which_arm)" />
+	<param name="filter_coef" value="$(arg filter_coefficient)" />
   </node>
--->
+
+  <node name="teleop_node" pkg="bwrobot" type="teleop_stream.py">
+  	<param name="teleop_pub_rate" value="$(arg tel_pub_rate)" />
+	<param name="device" value="$(arg teleop_device)" />
+	<param name="trajectory_filename" value="$(arg bag_file)" />
+  </node>
 
 </launch>

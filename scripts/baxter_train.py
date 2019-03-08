@@ -27,8 +27,10 @@ def jitter(n, Y_init, deg = 5):
 def initialize(limb, default_neutral = True):
     
     # Grab controllable joints
-    joint_names = rospy.get_param('~joints', ['right_s0', 'right_s1', 'right_e1', 'right_w1'])
-    limb_joint_names = limb.joint_names()
+    arm = rospy.get_param('~arm', 'right')
+    joints = rospy.get_param('~joints', ['s0', 's1', 'e1', 'w1'])
+    joint_names = [arm + '_' + joint for joint in joints]
+    # joint_names = rospy.get_param('~joints', ['right_s0', 'right_s1', 'right_e1', 'right_w1'])
     num_joints = len(joint_names)
 
     # Set robot to "default" position
@@ -38,9 +40,10 @@ def initialize(limb, default_neutral = True):
         for joint in joint_names:
             YStart.append(limb.joint_angle(joint))
     else:
-        YStart = rospy.get_param('~YStart')
-        angles = dict(zip(joint_names,np.deg2rad(YStart)))
-        limb.move_to_joint_positions(angles)
+        # YStart = rospy.get_param('~YStart')
+        # # angles = dict(zip(limb.joint_names,np.deg2rad(YStart)))
+        # angles = dict(zip(limb.joint_names(),YStart))
+        # limb.move_to_joint_positions(angles)
         YStart = []
         for joint in joint_names:
             YStart.append(limb.joint_angle(joint))        
@@ -146,11 +149,14 @@ def train():
     rate = rospy.Rate(R)
     traintime = rospy.Publisher('traintime', Float64, queue_size=10)
     GPpub = rospy.Publisher('localGP',LocalGP,queue_size=10, latch = True)
-    x_topic = rospy.get_param('~x_topic', 'robot/limb/right/endpoint_state')
+    arm = rospy.get_param('~arm', 'right')
+    x_topic = 'robot/limb/' + arm + '/endpoint_state'
+    # x_topic = rospy.get_param('~x_topic', 'robot/limb/right/endpoint_state')
     y_topic = rospy.get_param('~y_topic', 'robot/joint_states')
     buffer_duration = rospy.get_param('~buffer_duration', 0.1)
     buffer_size = rospy.get_param('~buffer_size', 100)
-    joint_names = rospy.get_param('~joints', ['right_s0', 'right_s1', 'right_e1', 'right_w1'])
+    joints = rospy.get_param('~joints', ['s0', 's1', 'e1', 'w1'])
+    joint_names = [arm + '_' + joint for joint in joints]
     njit = rospy.get_param('~njit')
     deg = rospy.get_param('~degree', 5)
     YStart = rospy.get_param('~YStart', [0,0,0,0])
@@ -179,8 +185,8 @@ def train():
     # TrainData.clear()
 
     "Initialize"
-    limb = baxter_interface.Limb('right')
-    XI,YI = initialize(limb)
+    limb = baxter_interface.Limb(arm)
+    XI,YI = initialize(limb, True)
     num_joints = np.size(YI,1)
     local = LocalModels(num_inducing, wgen = w_gen, xdim =3, ndim = num_joints*2)
     local.initializeF(XI,YI)
@@ -203,9 +209,12 @@ def train():
         if not TrainData.Xexp:
             continue
         else:
-            Xexp = np.asarray(TrainData.Xexp).reshape(len(TrainData.Xexp),3)
-            Y = np.asarray(TrainData.Yexp).reshape(len(TrainData.Yexp),num_joints)
-            Yexp = local.encode_ang(Y)
+            try:
+                Xexp = np.asarray(TrainData.Xexp).reshape(len(TrainData.Xexp),3)
+                Y = np.asarray(TrainData.Yexp).reshape(len(TrainData.Yexp),num_joints)
+                Yexp = local.encode_ang(Y)
+            except:
+                continue
 
         TrainData.clear()
         

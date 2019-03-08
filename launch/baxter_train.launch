@@ -2,15 +2,25 @@
 
   <arg name="jit_init" default ="25" />
   <arg name="deg" default ="3" />
-  <arg name="joint_names" default ="[right_s0, right_s1, right_e1, right_w1]" />
-  <arg name="joint_init" default ="[0, 0, 0, 0]" />
+  <arg name="joint_names" default ="[s0, s1, e1, w1]" />
+  <arg name="joint_init" default ="[0.67, 1.03, -0.5, -1.19, 1.94,-0.08,-1.0]" />
   <arg name="tr_pub_rate" default="100" />
   <arg name="num_ind" default ="25" />
   <arg name="w_thresh" default ="0.975" />
   <arg name="drift_num" default ="1" />
+  <arg name="which_arm" default ="right" />
+
+    starting_joint_angles = {'left_w0': 0.6699952259595108,
+                             'left_w1': 1.030009435085784,
+                             'left_w2': -0.4999997247485215,
+                             'left_e0': -1.189968899785275,
+                             'left_e1': 1.9400238130755056,
+                             'left_s0': -0.08000397926829805,
+                             'left_s1': -0.9999781166910306}
 
   <node name="jitter_node" pkg="bwrobot" type="baxter_jitter.py">
   	<rosparam param ="joints" subst_value="True">$(arg joint_names)</rosparam>
+	<param name="arm" value="$(arg which_arm)" />
   </node>
 
   <node name="train_node" pkg="bwrobot" type="baxter_train.py">
@@ -22,6 +32,7 @@
 	<param name="num_inducing" value="$(arg num_ind)" />
 	<param name="wgen" value="$(arg w_thresh)" />
 	<param name="drift" value="$(arg drift_num)" />
+	<param name="arm" value="$(arg which_arm)" />
   </node>
 
 </launch>
