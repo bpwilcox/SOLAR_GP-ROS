@@ -34,7 +34,7 @@ class SolarPredictor():
         self.pred_pub = rospy.Publisher('prediction', Arrays, queue_size=10)
         self.curX = []
         self.curPose = PoseStamped()
-        rospy.Subscriber('localGP',LocalGP,self.model_callback)
+        rospy.Subscriber('solarGP',LocalGP,self.model_callback)
         rospy.Subscriber(topic, EndpointState, self.x_callback, queue_size = 10)
 
     def x_callback(self, msg):
@@ -123,7 +123,7 @@ def pred():
     get_teleop = rospy.ServiceProxy('get_teleop', GetTeleop)
     teleop_state = GetTeleopResponse()
 
-    rospy.wait_for_message('localGP',LocalGP)
+    rospy.wait_for_message('solarGP',LocalGP)
     print("Ready")
     while not rospy.is_shutdown():
         

@@ -63,6 +63,9 @@ add_message_files(
   Arrays.msg
   OSGPR_GP.msg
   LocalGP.msg
+  Errors.msg
+  Results.msg
+  Params.msg
 #   Message1.msg
 #   Message2.msg
 )

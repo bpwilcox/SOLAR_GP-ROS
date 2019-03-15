@@ -28,8 +28,8 @@ class LocalModels():
         self.xdim = xdim
         self.ndim = ndim
         self.encode = True
-        self.var = np.array(0)
-        self.Ws = []
+        self.UpdateX = []
+        self.UpdateY = []
 
     def encode_ang(self, q):
         encoding = np.hstack((np.sin(q),np.cos(q))).reshape(np.size(q,0), np.size(q,1)*2)
@@ -106,22 +106,32 @@ class LocalModels():
 
         # self.Z.append(m.Z)
         self.W = W
-        self.Ws.append(W)
-        self.Models.append(m)
+        # self.Ws.append(W)
+        # self.Models.append(m)
 
-        X_loc = []
-        X_loc.append(1) # counter for number of local points partitioned
-        X_loc.append(1) # redundant, same as above
-        X_loc.append(XI[0].reshape(1,self.xdim)) # input model center (i.e. [xc,yc])
-        X_loc.append(YI[0].reshape(1,self.ndim)) #output model center (i.e. [q1, q2, q3,...])
-        X_loc.append(True) # flag for whether model has been updated with latest partition
-        self.LocalData.append(X_loc)
-        self.M = len(self.LocalData)
-        self.UpdateX = [None] * self.M # holds partitioned points for updating models
-        self.UpdateY = [None] * self.M
+        # X_loc = []
+        # X_loc.append(1) # counter for number of local points partitioned
+        # X_loc.append(1) # redundant, same as above
+        # X_loc.append(XI[0].reshape(1,self.xdim)) # input model center (i.e. [xc,yc])
+        # X_loc.append(YI[0].reshape(1,self.ndim)) #output model center (i.e. [q1, q2, q3,...])
+        # X_loc.append(True) # flag for whether model has been updated with latest partition
+        # self.LocalData.append(X_loc)
+        # self.M = len(self.LocalData)
+        # self.UpdateX = [None] * self.M # holds partitioned points for updating models
+        # self.UpdateY = [None] * self.M
 
-        self.partition(XI[1:],YI[1:])
+        self.partition(XI,YI)
         self.train()
+        # self.train_start()
+
+    def train_start(self):
+        for j, upd in enumerate(self.LocalData):
+            m = self.train_init(self.UpdateX[j],self.UpdateY[j],self.num_inducing)
+            self.Models.append(m)
+            self.LocalData[j][4] = True
+            self.UpdateX[j] = None
+            self.UpdateY[j] = None
+
 
     def train(self,flag = True):
         if flag:
@@ -135,8 +145,11 @@ class LocalModels():
                          #m.likelihood.variance = self.mdrift.likelihood.variance
                          #m.kern.variance =  self.mdrift.kern.variance
                          #m.kern.lengthscale =  self.mdrift.kern.lengthscale
-                        self.Models[j]  = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j], self.num_inducing, fixTheta = False,use_old_Z=False)
-                        # self.Z[j] = m.Z
+                        self.Models[j]  = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j], self.num_inducing, fixTheta = False, use_old_Z=True)
+                        # self.Models[j].likelihood.variance = self.mdrift.likelihood.variance
+                        # self.Models[j].kern.variance =  self.mdrift.kern.variance
+                        # self.Models[j].kern.lengthscale =  self.mdrift.kern.lengthscale                        
+                        
                         self.UpdateX[j] = None
                         self.UpdateY[j] = None
 
@@ -195,72 +208,51 @@ class LocalModels():
 
         return m_init
 
-    def partition(self,xnew,ynew, flag = True, useJointdist = False):
-        if flag:
-            M = len(self.LocalData)
-            M_loc = self.LocalData
-            W = self.W
-
-            UpdateX = self.UpdateX
-            UpdateY = self.UpdateY
-
-            for n in range(0,np.shape(xnew)[0],1):
-                w = np.empty([M,1]) # metric for distance between model center and query point
-                #dcw = np.empty([self.M, 1]) #metric for distance between model joint center  and previous query joint
-
-                for k in range(0,M,1):
-                    c = M_loc[k][2] #1x2
-                    d = self.LocalData[k][3]
-
-                    xW = np.dot((xnew[n]-c),W) # 1x2 X 2x2
+    def partition(self,xnew,ynew):
+        for n in range(0,np.shape(xnew)[0],1):
+            if self.M > 0:
+                w = np.empty([self.M,1]) # metric for distance between model center and query point
+                for k in range(0,self.M,1):
+                    c = self.LocalData[k][2] #1x2
+                    xW = np.dot((xnew[n]-c),self.W) # 1x2 X 2x2
                     w[k] = np.exp(-0.5*np.dot(xW,np.transpose((xnew[n]-c))))
-                    #dcw[k] = np.dot(d-ynew[n],np.transpose(d-ynew[n]))
 
-
-                if useJointdist:
-                #if self.encode:
-                    #wv = w*np.exp(-0.5*dcw)
-                    wv = w
-                else:
-                    wv = w
-                wnear = np.max(wv)
-                near = np.argmax(wv)
+                wnear = np.max(w)
+                near = np.argmax(w)
 
                 if wnear > self.wgen:
 
-                    if np.any(UpdateX[near]==None):
+                    if np.any(self.UpdateX[near]==None):
 
-                        UpdateX[near] = xnew[n].reshape(1,self.xdim)
-                        UpdateY[near] = ynew[n].reshape(1,self.ndim)
+                        self.UpdateX[near] = xnew[n].reshape(1,self.xdim)
+                        self.UpdateY[near] = ynew[n].reshape(1,self.ndim)
                     else:
 
-                        UpdateX[near] = np.vstack((UpdateX[near],xnew[n]))
-                        UpdateY[near] = np.vstack((UpdateY[near],ynew[n]))
+                        self.UpdateX[near] = np.vstack((self.UpdateX[near],xnew[n]))
+                        self.UpdateY[near] = np.vstack((self.UpdateY[near],ynew[n]))
 
-                    nloc = M_loc[near][0]
-                    M_loc[near][0]+=1
-                    M_loc[near][1]+=1
-                    M_loc[near][2] = (xnew[n]+ M_loc[near][2]*nloc)/(nloc+1)
-                    M_loc[near][3] = (ynew[n]+ M_loc[near][3]*nloc)/(nloc+1)
-                else:
+                    nloc = self.LocalData[near][0]
+                    self.LocalData[near][0] +=1
+                    self.LocalData[near][1] +=1
+                    self.LocalData[near][2] = (xnew[n]+ self.LocalData[near][2]*nloc)/(nloc+1)
+                    self.LocalData[near][3] = (ynew[n]+ self.LocalData[near][3]*nloc)/(nloc+1)
+            else:
+                wnear = 0
 
-                    UpdateX.append(xnew[n].reshape(1,self.xdim))
-                    UpdateY.append(ynew[n].reshape(1,self.ndim))
+            if wnear < self.wgen:
 
-                    M_new = []
-                    M_new.append(1)
-                    M_new.append(1)
-                    M_new.append(xnew[n].reshape(1,self.xdim))
-                    M_new.append(ynew[n].reshape(1,self.ndim))
-                    M_new.append(False)
-                    M_loc.append(M_new)
+                self.UpdateX.append(xnew[n].reshape(1,self.xdim))
+                self.UpdateY.append(ynew[n].reshape(1,self.ndim))
 
-                    M = M+1
+                M_new = []
+                M_new.append(1)
+                M_new.append(1)
+                M_new.append(xnew[n].reshape(1,self.xdim))
+                M_new.append(ynew[n].reshape(1,self.ndim))
+                M_new.append(False)
+                self.LocalData.append(M_new)
 
-            self.M = M
-            self.LocalData = M_loc
-            self.UpdateX = UpdateX
-            self.UpdateY = UpdateY
+                self.M +=1
 
 
     def init_Z(self,cur_Z, new_X, num_inducing, use_old_Z=True, driftZ=False):
@@ -304,7 +296,7 @@ class LocalModels():
 
         else:
             M = cur_Z.shape[0]
-            #M_old = int(0.7 * M)
+            # M_old = int(0.7 * M)
             M_old = M - len(new_X)
             M_new = M - M_old
             old_Z = cur_Z[np.random.permutation(M)[0:M_old], :]
@@ -343,7 +335,7 @@ class LocalModels():
 
 
         m_new.optimize()
-
+        # print('num_inducing: ' + str(len(m_new.Z)))
         m_new.Z.unfix()
         m_new.kern.unfix()
         m_new.likelihood.variance.unfix()
@@ -388,16 +380,9 @@ class LocalModels():
                     d = self.LocalData[k][3]
 
                     xW = np.dot((xtest[n]-c),self.W) # 1x2 X 2x2
-                    #print(xW)
                     w[k] = np.exp(-0.5*np.dot(xW,np.transpose((xtest[n]-c))))
-                    #print(w[k])
                     yploc[k], var[k] = self.Models[k].predict(xtest[n].reshape(1,self.xdim))
-                    #print(yploc[k])
-                    #xploc[k], _ = self.robot.fkin(self.decode(yploc[k].reshape(1,self.ndim)))
-                    
-#                    dw[k] = np.dot(yploc[k]-Y_prev[-1].reshape(1,self.ndim),np.transpose(yploc[k]-Y_prev[-1].reshape(1,self.ndim)))
-#                    dw[k] = np.linalg.norm(circstats.difference(yploc[k],Y_prev))
-#                    dc[k] = np.dot(yploc[k]-d,np.transpose(yploc[k]-d))
+
                     if Y_prev == []:
                         pass
                     else:
@@ -405,10 +390,7 @@ class LocalModels():
                 except:
 
                     w[k] = 0
-                    dw[k] = float("inf")
-                    dc[k] = float("inf")
                     dcw[k] = float("inf")
-#                    var[k] = float("inf")
                     pass
 
             if weighted:
@@ -419,31 +401,32 @@ class LocalModels():
             else:
                 h = 1
 
+
+
             self.w = w
             s = 0
             if Y_prev == []:
                 wv = w/var
             else:
                 wv = w*np.exp(-s*dcw)/var
-                # wv = w*np.exp(-var)
-            #wv = w
-            #wv = w*np.exp(-s*dcw*var)
-            #wv = w*np.exp(-var)
-            #wv = w/var
+
             wv =np.nan_to_num(wv)
+            
             wv = wv.reshape(self.M,)
             varmin = np.min(var) # minimum variance of local predictions
-#            wv = wv/np.sum(wv)
             thresh = 0 # 0 uses all models
 
             self.wv = wv
-            self.var = var
             "Select for best models"
             if np.max(wv) < thresh:
                 ind = wv ==np.max(wv)
             else:
                 ind = wv > thresh
-            #print(ind)
+
+
+            # ind = np.argpartition(wv, -h)[-h:]
+            # ypred[n] = np.dot(np.transpose(wv[ind]), yploc[ind]) / np.sum(wv[ind])
+
             if self.encode:
                 "Normal Weighted mean"
                 ypred[n] = np.dot(np.transpose(wv[ind]), yploc[ind]) / np.sum(wv[ind])

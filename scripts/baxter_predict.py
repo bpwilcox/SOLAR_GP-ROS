@@ -227,7 +227,7 @@ def predict():
         "Get next model"   
         if wait_for_train:
             LocMsg = rospy.wait_for_message('localGP',LocalGP)
-            local = deconstructMsg(LocMsg)  
+            local = deconstructMsg(LocMsg)
             Loc.local = local
             Loc.count +=1
         else:

@@ -6,7 +6,7 @@ from copy import copy, deepcopy
 import rosbag
 from geometry_msgs.msg import PoseStamped
 from teleop_utils.srv import SetPose, GetTeleop, GetTeleopResponse, GetTeleopRequest
-from std_msgs.msg import Header
+from std_msgs.msg import Header, Bool
 from std_srvs.srv import Empty, EmptyResponse
 
 class TrajectorySender():
@@ -19,6 +19,8 @@ class TrajectorySender():
         self.button5 = False
         self.button6 = False
         self.button7 = False
+        self.button8 = False
+
         self.nextPose = PoseStamped()
         self.currentPose = PoseStamped()
         self.path = Path()
@@ -32,6 +34,8 @@ class TrajectorySender():
         self.setPose_service = rospy.Service('set_teleop_pose',SetPose, self.set_pose)
         self.getTeleop_service = rospy.Service('get_teleop',GetTeleop, self.get_teleop)
         self.restart_service = rospy.Service('restart_bag', Empty, self.restart)
+        self.pub_done = rospy.Publisher('trajectory_finished', Bool, queue_size=10, latch=True)
+
         # self._on_init()
         self.duration = 1.0/rate
         rospy.Timer(rospy.Duration(self.duration), self.timer_callback)
@@ -56,16 +60,22 @@ class TrajectorySender():
             self.nextPose.header.frame_id = '/teleop'
             self.currentPose = self.nextPose
             self.i+=1
+        else:
+            self.button8 = True
+        self.pub_done.publish(self.button8)
+        # self.pub_pose.publish(self.currentPose)
+        # self.pub_path.publish(self.path)
 
     def set_pose(self,req):
         self.currentPose = req.pose
         return True
         
     def get_teleop(self,req):
-        return self.nextPose, self.button1, self.button2, self.button3, self.button4, self.button5, self.button6, self.button7
+        return self.nextPose, self.button1, self.button2, self.button3, self.button4, self.button5, self.button6, self.button7, self.button8
     
     def restart(self, req):
         self.i = 0
+        self.button8 = False
         return EmptyResponse()
 
 # def sender():

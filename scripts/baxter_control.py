@@ -36,21 +36,30 @@ class ControlJoints():
         rospy.Subscriber(topic, JointState, self.curr_callback, queue_size = 10)
         self.k = 25
         self.limit = 0.1
+        self.neutral_service = rospy.Service('set_neutral',SetNeutral, self.neutral_callback)
+        self.jit_service= rospy.Service('jitter', Jitter, self.jitter_callback)
 
-        # self.gripper_state = 1 # Assume gripper starts open
+    def jitter(self, njit, deg):
 
-    # def toggle_gripper(self):
-    #     if self.gripper_state:
-    #         self.gripper.close()
-    #         self.gripper_state = 0
-    #     else:
-    #         self.gripper.open()
-    #         self.gripper_state = 1
+        Y = np.array(self.currentY).reshape(1,len(self.joint_names))   
+        pert = deg * 0.0174533 * np.random.uniform(-1.,1.,(njit, np.size(Y,1)))
+        YI = Y + pert
+
+        for y in YI:        
+            self.limb.move_to_joint_positions(dict(zip(self.joint_names,y.tolist())))
 
     def set_neutral(self):
         self.limb.move_to_neutral()
         self.nextY = self.currentY[:]
 
+    def neutral_callback(self, req):
+        self.set_neutral()
+        return True
+
+    def jitter_callback(self, req):
+        self.jitter(req.num_jit, req.degree)
+        return True
+        
     def pred_callback(self, msg):
         self.nextY = msg.array
 
@@ -155,14 +164,16 @@ def actuate():
         # limb.set_joint_positions(dict(zip(joint_names, MoveRobot.nextY)))
         # limb.set_joint_positions(MoveRobot.filtered_cmd())
         teleop_state = get_teleop()
-        # if teleop_state.button6:
-        #     jitter_pos(5,3)
+        if teleop_state.button6:
+            MoveRobot.jitter(5,3)
         if teleop_state.button7:
             MoveRobot.set_neutral()
         if teleop_state.button4:
             gripper.close()
         elif teleop_state.button5:
             gripper.open()
+        if teleop_state.button8:
+            continue       
         MoveRobot.move_joints()
 
 

@@ -28,6 +28,7 @@ def teleop():
 
     while not rospy.is_shutdown():
         Teleoperator.pub_pose.publish(Teleoperator.currentPose)
+        Teleoperator.pub_pose_next.publish(Teleoperator.nextPose)
         Teleoperator.pub_path.publish(Teleoperator.path)
         rate.sleep()
 
