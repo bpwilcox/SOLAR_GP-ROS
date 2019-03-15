@@ -220,7 +220,7 @@ class LocalModels():
                 wnear = np.max(w)
                 near = np.argmax(w)
 
-                if wnear > self.wgen:
+                if wnear > self.wgen or self.M > 10:
 
                     if np.any(self.UpdateX[near]==None):
 
