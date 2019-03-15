@@ -3,7 +3,7 @@
 import rospy
 import rosbag
 from bwrobot.msg import LocalGP, Errors, Params
-from bwrobot.srv import SaveToFile
+from bwrobot.srv import SaveToFile, SetNeutral
 from trainer import Solar_Trainer
 from test_results import TestResults
 from std_srvs.srv import Empty, EmptyRequest
@@ -17,23 +17,14 @@ class TestStarter():
         self.Trainer = Trainer
         self.DataCollector = DataCollector
         rospy.wait_for_service('restart_bag')
-        self.restart = rospy.ServiceProxy('restart_bag', Empty)
-        rospy.wait_for_service('get_teleop')
-        self.get_teleop = rospy.ServiceProxy('get_teleop', GetTeleop)        
+        self.restart = rospy.ServiceProxy('restart_bag', Empty)  
+        rospy.wait_for_service('set_neutral')
+        self.set_neutral = rospy.ServiceProxy('set_neutral', SetNeutral)              
         rospy.Subscriber('trajectory_finished', Bool, self.done_callback, queue_size=10)
-        # rospy.Timer(rospy.Duration(10), self.timer_callback)
 
     def done_callback(self, msg):
         if msg.data:
             self.stop_trainer()
-
-    def timer_callback(self, event):
-        # try:
-        teleop_state = self.get_teleop()
-        if teleop_state.button8:
-            self.stop_trainer()
-        # except:
-        #     pass
 
     def init_trainer(self):
         self.Trainer.initialize()
@@ -43,7 +34,6 @@ class TestStarter():
     def run_trainer(self):
         rospy.loginfo("Running Trainer")
         self.Trainer.stop = False
-        # rospy.Timer(rospy.Duration(0.25), self.timer_callback)
         self.Trainer.run()
 
     def run_data_collector(self):
@@ -58,6 +48,12 @@ class TestStarter():
         self.init_trainer()
         self.run_data_collector()
         self.run_trainer()
+
+    def run_again(self):
+        self.set_neutral()
+        self.run_trainer()
+        self.run_data_collector()
+        self.restart(EmptyRequest())
 
     def end_test(self):
         rospy.loginfo("Ending Test")
@@ -90,19 +86,25 @@ def start():
     Test = TestStarter(Trainer, DataCollector)
     directory = '/home/bpwilcox/catkin_ws/src/SOLAR_GP-ROS/bags/tests/'
 
-    num_inducing = range(5,50,5)
-    w_gen = np.linspace(0.75, 0.99, 10)
+    num_inducing = range(15,50,5)
+    w_gen = np.linspace(0.8, 0.985, 5)
 
     test_num = 1
+    redos = 0
     for inducing in num_inducing:
         for thresh in w_gen:
             Test.Trainer.num_inducing = inducing
             Test.Trainer.wgen = thresh
-            rospy.loginfo("Starting Test # %s out of %s", test_num, len(num_inducing)*len(w_gen))
+            rospy.loginfo("Starting Test # %s out of %s", test_num, (redos+1)* len(num_inducing)*len(w_gen))
             Test.DataCollector.filename = directory + 'test_'+ time.strftime("%Y%m%d-%H%M%S") + '.bag'
             Test.start_test()
-            Test.end_test()  
-            test_num +=1       
+            Test.end_test()
+            test_num +=1
+            for times in range (0, redos):
+                rospy.loginfo("Starting Test # %s out of %s", test_num, len(num_inducing)*len(w_gen))
+                Test.DataCollector.filename = directory + 'test_redo_'+ time.strftime("%Y%m%d-%H%M%S") + '.bag'            
+                Test.run_again()
+                test_num +=1       
 
     # for test_num in range(0, 3):
 

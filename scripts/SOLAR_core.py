@@ -239,8 +239,8 @@ class LocalModels():
             else:
                 wnear = 0
 
-            if wnear < self.wgen:
-
+            if wnear < self.wgen and self.M < 10:
+                print(wnear)
                 self.UpdateX.append(xnew[n].reshape(1,self.xdim))
                 self.UpdateY.append(ynew[n].reshape(1,self.ndim))
 
@@ -360,7 +360,7 @@ class LocalModels():
         mean = np.arctan2(y,x)
         return mean
 
-    def prediction(self,xtest, weighted = True, bestm = 2, Y_prev = []):
+    def prediction(self,xtest, weighted = True, bestm = 3, Y_prev = []):
         ypred = np.empty([np.shape(xtest)[0], self.ndim])
         for n in range(0, np.shape(xtest)[0], 1):
             w = np.empty([self.M, 1])
@@ -416,15 +416,14 @@ class LocalModels():
             varmin = np.min(var) # minimum variance of local predictions
             thresh = 0 # 0 uses all models
 
-            self.wv = wv
             "Select for best models"
-            if np.max(wv) < thresh:
-                ind = wv ==np.max(wv)
-            else:
-                ind = wv > thresh
+            # if np.max(wv) < thresh:
+            #     ind = wv ==np.max(wv)
+            # else:
+            #     ind = wv > thresh
 
 
-            # ind = np.argpartition(wv, -h)[-h:]
+            ind = np.argpartition(wv, -h)[-h:]
             # ypred[n] = np.dot(np.transpose(wv[ind]), yploc[ind]) / np.sum(wv[ind])
 
             if self.encode:

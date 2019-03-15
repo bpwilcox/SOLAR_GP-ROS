@@ -190,7 +190,7 @@ class Solar_Trainer():
 
             self.TrainData.clear()
             try:
-                mdrift = self.solar.doOSGPR(Xexp, Yexp, self.solar.mdrift, self.solar.num_inducing ,use_old_Z = False, driftZ = False)
+                mdrift = self.solar.doOSGPR(Xexp, Yexp, self.solar.mdrift, 100 ,use_old_Z = True, driftZ = False)
                 mkl = []
                 for j in range(0, self.solar.xdim):
                     mkl.append(1/(mdrift.kern.lengthscale[j]**2))
