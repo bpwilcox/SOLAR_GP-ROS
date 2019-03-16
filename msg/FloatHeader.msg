@@ -1,2 +1,2 @@
-float64 error
+float32 data
 Header header

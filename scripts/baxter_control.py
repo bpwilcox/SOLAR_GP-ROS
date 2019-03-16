@@ -157,12 +157,6 @@ def actuate():
     rospy.wait_for_message('prediction',Arrays)
     print("Ready")
     while not rospy.is_shutdown():
-        # print('current: ', MoveRobot.currentY)
-        # print('target: ', MoveRobot.nextY)
-        # print('velocity: ', MoveRobot.get_joint_command())
-        # limb.set_joint_velocities(dict(zip(joint_names, MoveRobot.get_joint_command())))
-        # limb.set_joint_positions(dict(zip(joint_names, MoveRobot.nextY)))
-        # limb.set_joint_positions(MoveRobot.filtered_cmd())
         teleop_state = get_teleop()
         if teleop_state.button6:
             MoveRobot.jitter(5,3)

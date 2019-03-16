@@ -7,7 +7,7 @@ from sensor_msgs.msg import JointState
 from geometry_msgs.msg import PoseStamped, Pose
 from copy import deepcopy, copy
 from baxter_core_msgs.msg import EndpointState
-from bwrobot.msg import LocalGP, Errors, Results, Params
+from bwrobot.msg import LocalGP, Errors, Results, Params, IntHeader, FloatHeader
 from std_msgs.msg import Time, Header
 
 class TestResults():
@@ -21,16 +21,24 @@ class TestResults():
         rospy.Subscriber(test_topic, EndpointState, self.test_callback, queue_size = 10)
         rospy.Subscriber(cur_topic, PoseStamped, self.cur_callback, queue_size = 10)
         rospy.Subscriber(GP_topic, LocalGP, self.GP_callback, queue_size = 10)
-        self.pub_error = rospy.Publisher('error', Errors, queue_size=10)
+        self.pub_error = rospy.Publisher('error', FloatHeader, queue_size=10)
         self.i = 0
         self.j = 0
+        self.running = False   
+        rospy.Timer(rospy.Duration(self.duration), self.timer_callback)
 
     def run(self):
+        self.clear()
+        self.running = True
+
+    def clear(self):
         self.results.errors = []
         self.results.updates = []
         self.i = 0
         self.j = 0
-        rospy.Timer(rospy.Duration(self.duration), self.timer_callback)
+
+    def stop(self):
+        self.running = False
 
     def save_data(self):
         try:
@@ -38,6 +46,8 @@ class TestResults():
             bag.write('results', self.results)
         finally:
             bag.close()
+        # self.stop()
+
 
     def test_callback(self, msg):
         self.test_pose = msg.pose
@@ -46,18 +56,19 @@ class TestResults():
         self.actual_pose = msg.pose
         
     def GP_callback(self, msg):
-        # update = Header
-        # update.data = rospy.Time.now()
-        # Header(seq = self.i, stamp = rospy.Time.now())
-        self.results.updates.append(Header(seq = self.i, stamp = rospy.Time.now()))
+        update = IntHeader()
+        update.header = Header(seq = self.i, stamp = rospy.Time.now())
+        update.data = msg.M
+        self.results.updates.append(update)
 
     def timer_callback(self, event):
-        error = Errors()
-        error.error = self.error_distance(self.actual_pose, self.test_pose)
-        error.header = Header(seq = self.i, stamp = rospy.Time.now())
-        self.results.errors.append(error)
-        # self.pub_error.publish(error)
-        self.i+=1
+        if self.running:
+            error = FloatHeader()
+            error.data = self.error_distance(self.actual_pose, self.test_pose)
+            error.header = Header(seq = self.i, stamp = rospy.Time.now())
+            self.results.errors.append(error)
+            # self.pub_error.publish(error)
+            self.i+=1
     
     def error_distance(self, pose1, pose2):
         x1 = np.array([pose1.position.x, pose1.position.y, pose1.position.z]).reshape(1,3)

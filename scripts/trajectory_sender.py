@@ -34,6 +34,10 @@ class TrajectorySender():
         self.setPose_service = rospy.Service('set_teleop_pose',SetPose, self.set_pose)
         self.getTeleop_service = rospy.Service('get_teleop',GetTeleop, self.get_teleop)
         self.restart_service = rospy.Service('restart_bag', Empty, self.restart)
+        self.run_service = rospy.Service('run_bag', Empty, self.run)
+        self.stop_service = rospy.Service('stop_bag', Empty, self.stop)
+        self.running = False
+
         self.pub_done = rospy.Publisher('trajectory_finished', Bool, queue_size=10, latch=True)
 
         # self._on_init()
@@ -53,18 +57,17 @@ class TrajectorySender():
         self.currentPose = self.nextPose
 
     def timer_callback(self, event):
-        self.path.header.stamp = rospy.Time.now()
-        if self.i < len(self.path.poses):
-            self.nextPose = self.path.poses[self.i]
-            self.nextPose.header.stamp = rospy.Time.now()
-            self.nextPose.header.frame_id = '/teleop'
-            self.currentPose = self.nextPose
-            self.i+=1
-        else:
-            self.button8 = True
-        self.pub_done.publish(self.button8)
-        # self.pub_pose.publish(self.currentPose)
-        # self.pub_path.publish(self.path)
+        if self.running:
+            self.path.header.stamp = rospy.Time.now()
+            if self.i < len(self.path.poses):
+                self.nextPose = self.path.poses[self.i]
+                self.nextPose.header.stamp = rospy.Time.now()
+                self.nextPose.header.frame_id = '/teleop'
+                self.currentPose = self.nextPose
+                self.i+=1
+            else:
+                self.button8 = True
+            self.pub_done.publish(self.button8)
 
     def set_pose(self,req):
         self.currentPose = req.pose
@@ -75,9 +78,18 @@ class TrajectorySender():
     
     def restart(self, req):
         self.i = 0
-        self.button8 = False
+        # self.button8 = False
         return EmptyResponse()
 
+    def run(self, req):
+        self.running = True
+        self.button8 = False
+        return EmptyResponse()
+        
+    def stop(self, req):
+        self.running = False
+        self.button8 = True
+        return EmptyResponse()
 # def sender():
 
 #     rospy.init_node('trajectory_sender_node')

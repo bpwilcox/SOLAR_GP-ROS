@@ -17,7 +17,14 @@ class TestStarter():
         self.Trainer = Trainer
         self.DataCollector = DataCollector
         rospy.wait_for_service('restart_bag')
-        self.restart = rospy.ServiceProxy('restart_bag', Empty)  
+        self.restart_bag = rospy.ServiceProxy('restart_bag', Empty)
+
+        rospy.wait_for_service('run_bag')
+        self.run_bag = rospy.ServiceProxy('run_bag', Empty)
+
+        rospy.wait_for_service('stop_bag')
+        self.stop_bag = rospy.ServiceProxy('stop_bag', Empty)
+
         rospy.wait_for_service('set_neutral')
         self.set_neutral = rospy.ServiceProxy('set_neutral', SetNeutral)              
         rospy.Subscriber('trajectory_finished', Bool, self.done_callback, queue_size=10)
@@ -28,7 +35,7 @@ class TestStarter():
 
     def init_trainer(self):
         self.Trainer.initialize()
-        self.restart(EmptyRequest())
+        # self.restart(EmptyRequest())
         rospy.loginfo("Model Initialized")
 
     def run_trainer(self):
@@ -46,17 +53,34 @@ class TestStarter():
 
     def start_test(self):
         self.init_trainer()
+        self.restart_bag()
+        self.run_bag()
         self.run_data_collector()
         self.run_trainer()
+        self.stop_bag()
+        # self.DataCollector.stop()
 
     def run_again(self):
         self.set_neutral()
-        self.run_trainer()
+        # self.restart(EmptyRequest())
+        self.restart_bag()
+        self.run_bag()
         self.run_data_collector()
-        self.restart(EmptyRequest())
+        self.run_trainer()
+        self.stop_bag()
+        # self.DataCollector.stop()
+
+    def run_no_train(self):
+        self.set_neutral()
+        self.restart_bag()
+        self.run_bag()
+        self.run_data_collector()
+        self.stop_bag()
+        # self.DataCollector.stop()
 
     def end_test(self):
         rospy.loginfo("Ending Test")
+        self.DataCollector.stop()
         self.DataCollector.save_data()
 
 
@@ -90,21 +114,33 @@ def start():
     w_gen = np.linspace(0.8, 0.985, 5)
 
     test_num = 1
-    redos = 0
+    redos = 2
     for inducing in num_inducing:
         for thresh in w_gen:
             Test.Trainer.num_inducing = inducing
             Test.Trainer.wgen = thresh
-            rospy.loginfo("Starting Test # %s out of %s", test_num, (redos+1)* len(num_inducing)*len(w_gen))
+            rospy.loginfo("Starting Test # %s out of %s", test_num, (redos+2)* len(num_inducing)*len(w_gen))
             Test.DataCollector.filename = directory + 'test_'+ time.strftime("%Y%m%d-%H%M%S") + '.bag'
+            param = Params()
+            param.njit = njit
+            param.inducing = inducing
+            param.degrees = deg
+            param.wgen = thresh
+            Test.DataCollector.results.params = param
             Test.start_test()
             Test.end_test()
             test_num +=1
             for times in range (0, redos):
-                rospy.loginfo("Starting Test # %s out of %s", test_num, len(num_inducing)*len(w_gen))
+                rospy.loginfo("Starting Test # %s out of %s", test_num, (redos+2)* len(num_inducing)*len(w_gen))
                 Test.DataCollector.filename = directory + 'test_redo_'+ time.strftime("%Y%m%d-%H%M%S") + '.bag'            
                 Test.run_again()
-                test_num +=1       
+                Test.end_test()
+                test_num +=1
+            rospy.loginfo("Starting Test # %s out of %s", test_num, (redos+2)* len(num_inducing)*len(w_gen))
+            Test.DataCollector.filename = directory + 'test_no_train_'+ time.strftime("%Y%m%d-%H%M%S") + '.bag'
+            Test.run_no_train()
+            Test.end_test()
+            test_num +=1
 
     # for test_num in range(0, 3):
 

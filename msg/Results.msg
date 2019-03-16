@@ -1,3 +1,3 @@
-bwrobot/Errors[] errors
+bwrobot/FloatHeader[] errors
 bwrobot/Params params
-std_msgs/Header[] updates
+bwrobot/IntHeader[] updates
