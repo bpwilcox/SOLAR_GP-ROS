@@ -62,8 +62,8 @@ class TestStarter():
 
     def run_again(self):
         self.set_neutral()
-        # self.restart(EmptyRequest())
         self.restart_bag()
+        # self.restart(EmptyRequest())
         self.run_bag()
         self.run_data_collector()
         self.run_trainer()
@@ -75,6 +75,9 @@ class TestStarter():
         self.restart_bag()
         self.run_bag()
         self.run_data_collector()
+        self.Trainer.stop = False
+        while not self.Trainer.stop:    
+            pass
         self.stop_bag()
         # self.DataCollector.stop()
 
@@ -112,6 +115,9 @@ def start():
 
     num_inducing = range(15,50,5)
     w_gen = np.linspace(0.8, 0.985, 5)
+
+    num_inducing = [25]
+    w_gen = [0.892, 0.939]
 
     test_num = 1
     redos = 2
