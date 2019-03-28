@@ -3,6 +3,8 @@ import GPy
 import osgpr_GPy
 import circstats
 from copy import copy, deepcopy
+from GPy import likelihoods
+
 class LocalModels():
 
 
@@ -145,7 +147,7 @@ class LocalModels():
                          #m.likelihood.variance = self.mdrift.likelihood.variance
                          #m.kern.variance =  self.mdrift.kern.variance
                          #m.kern.lengthscale =  self.mdrift.kern.lengthscale
-                        self.Models[j]  = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j], self.num_inducing, fixTheta = False, use_old_Z=True)
+                        self.Models[j]  = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j], self.num_inducing, fixTheta = False, use_old_Z=False)
                         # self.Models[j].likelihood.variance = self.mdrift.likelihood.variance
                         # self.Models[j].kern.variance =  self.mdrift.kern.variance
                         # self.Models[j].kern.lengthscale =  self.mdrift.kern.lengthscale                        
@@ -157,8 +159,9 @@ class LocalModels():
                 else:
                     print("Add New Model")
                     #m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j-1], self.num_inducing, fixTheta = False, driftZ = False,use_old_Z=True)
-                    m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.mdrift, self.num_inducing, fixTheta = False, driftZ = False,use_old_Z=False)
-
+#                    m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.mdrift, self.num_inducing, fixTheta = False, fixZ = False, use_old_Z=True)
+                    m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.mdrift, self.num_inducing, fixTheta = False, fixZ = False, use_old_Z=False)
+#                    m = self.train_init(self.UpdateX[j],self.UpdateY[j], self.num_inducing)
                     self.Models.append(m)
                     self.LocalData[j][4] = True
                     # self.Z.append(m.Z)
@@ -203,12 +206,13 @@ class LocalModels():
         if len(X) < num_inducing:
             num_inducing = len(X)
         Z = X[np.random.permutation(X.shape[0])[0:num_inducing], :]
-        m_init = GPy.models.SparseGPRegression(X,Y,GPy.kern.RBF(self.xdim,ARD=True),Z=Z)
+#        m_init = GPy.models.SparseGPRegression(X,Y,GPy.kern.RBF(self.xdim,ARD=True),Z=Z)
+        m_init = GPy.core.SparseGP(X,Y,Z,GPy.kern.RBF(self.xdim,ARD=True), likelihood = likelihoods.Gaussian(), inference_method = GPy.inference.latent_function_inference.VarDTC())
         m_init.optimize(messages=False)
 
         return m_init
 
-    def partition(self,xnew,ynew):
+    def partition(self,xnew,ynew, m_limit = 10):
         for n in range(0,np.shape(xnew)[0],1):
             if self.M > 0:
                 w = np.empty([self.M,1]) # metric for distance between model center and query point
@@ -220,7 +224,7 @@ class LocalModels():
                 wnear = np.max(w)
                 near = np.argmax(w)
 
-                if wnear > self.wgen or self.M > 10:
+                if wnear > self.wgen or self.M > m_limit:
 
                     if np.any(self.UpdateX[near]==None):
 
@@ -239,7 +243,7 @@ class LocalModels():
             else:
                 wnear = 0
 
-            if wnear < self.wgen and self.M < 10:
+            if wnear < self.wgen and self.M < m_limit:
                 print(wnear)
                 self.UpdateX.append(xnew[n].reshape(1,self.xdim))
                 self.UpdateY.append(ynew[n].reshape(1,self.ndim))
@@ -255,7 +259,14 @@ class LocalModels():
                 self.M +=1
 
 
-    def init_Z(self,cur_Z, new_X, num_inducing, use_old_Z=True, driftZ=False):
+    def variance(self, T):
+        X = np.atleast_2d(T)
+        if np.shape(X)[1] > 1:
+            return np.mean(np.diag(np.cov(X)))
+        else:
+            return np.mean((X - np.mean(X))**2)
+
+    def init_Z(self,cur_Z, new_X, num_inducing, use_old_Z=True):
 
         """
         Initialization ideas:
@@ -266,28 +277,14 @@ class LocalModels():
 
 
         M = cur_Z.shape[0]
-        if driftZ:
-            if M < num_inducing:
-                M_new = num_inducing - M
-                old_Z = cur_Z[np.random.permutation(M), :]
-                new_Z = new_X[np.random.permutation(new_X.shape[0])[0:M_new],:]
-                Z = np.vstack((old_Z, new_Z))
-#                print(len(Z))
-            else:
-                M = cur_Z.shape[0]
-                M_old = M - len(new_X)
-                M_new = M - M_old
-                old_Z = cur_Z[M_new:,:]
-                new_Z = new_X[np.random.permutation(new_X.shape[0])[0:M_new], :]
-                Z = np.vstack((old_Z, new_Z))
-
-        elif M < num_inducing:
+        if M < num_inducing:
             M_new = num_inducing - M
             old_Z = cur_Z[np.random.permutation(M), :]
             new_Z = new_X[np.random.permutation(new_X.shape[0])[0:M_new],:]
             Z = np.vstack((old_Z, new_Z))
 
         elif M > num_inducing:
+
             M_new = M - num_inducing
             old_Z = cur_Z[np.random.permutation(M), :]
             Z = np.delete(old_Z, np.arange(0,M_new),axis = 0)
@@ -295,16 +292,21 @@ class LocalModels():
             Z = np.copy(cur_Z)
 
         else:
-            M = cur_Z.shape[0]
-            # M_old = int(0.7 * M)
-            M_old = M - len(new_X)
+            
+            R = self.variance(new_X)/(self.variance(new_X)+self.variance(cur_Z))
+            p = int(M*R)
+            if p == 0:
+                M_old = M-1
+            else:
+                M_old = M - np.min([M-1, p])
+            M_old = M - p
             M_new = M - M_old
             old_Z = cur_Z[np.random.permutation(M)[0:M_old], :]
             new_Z = new_X[np.random.permutation(new_X.shape[0])[0:M_new], :]
             Z = np.vstack((old_Z, new_Z))
         return Z
 
-    def doOSGPR(self,X,Y,m_old, num_inducing,use_old_Z=True, driftZ = False, fixTheta = False):
+    def doOSGPR(self,X,Y,m_old, num_inducing,use_old_Z=True, fixZ = False, fixTheta = False):
 
         Zopt = copy(m_old.Z.param_array)
         mu, Su = m_old.predict(Zopt, full_cov = True)
@@ -315,7 +317,7 @@ class LocalModels():
         kern.variance = copy(m_old.kern.variance)
         kern.lengthscale = copy(m_old.kern.lengthscale)
 
-        Zinit = self.init_Z(Zopt, X, num_inducing, use_old_Z, driftZ)
+        Zinit = self.init_Z(Zopt, X, num_inducing, use_old_Z)
 
         m_new = osgpr_GPy.OSGPR_VFE(X, Y, kern, mu, Su, Kaa,
             Zopt, Zinit)
@@ -326,7 +328,7 @@ class LocalModels():
 
 
         "Fix parameters"
-        if driftZ:
+        if fixZ:
             m_new.Z.fix()
 
         if fixTheta:
@@ -334,7 +336,8 @@ class LocalModels():
             m_new.likelihood.variance.fix()
 
 
-        m_new.optimize()
+        m_new.optimize(messages = False, ipython_notebook = False)
+#        m_new.optimize_restarts(3, verbose = False, robust = True)
         # print('num_inducing: ' + str(len(m_new.Z)))
         m_new.Z.unfix()
         m_new.kern.unfix()
@@ -363,25 +366,27 @@ class LocalModels():
     def prediction(self,xtest, weighted = True, bestm = 3, Y_prev = []):
         ypred = np.empty([np.shape(xtest)[0], self.ndim])
         for n in range(0, np.shape(xtest)[0], 1):
-            w = np.empty([self.M, 1])
-            dw = np.empty([self.M, 1])
-            dc = np.empty([self.M, 1])
-            dcw = np.empty([self.M, 1])
+            w = np.empty([self.M,1])
+            dcw = np.empty([self.M,1 ])
 
-            yploc = np.empty([self.M,self.ndim])
-            #xploc = np.empty([self.M,self.xdim])
+            if weighted:
+                if bestm > self.M:
+                    h = self.M
+                else:
+                    h = bestm
+            else:
+                h = 1
 
-            var = np.empty([self.M,1])
+            yploc = np.empty([h,self.ndim])
+            var = np.empty([h,1])
+            
             for k in range(0, self.M, 1):
-
-
                 try:
                     c = self.LocalData[k][2] #1x2
                     d = self.LocalData[k][3]
 
                     xW = np.dot((xtest[n]-c),self.W) # 1x2 X 2x2
                     w[k] = np.exp(-0.5*np.dot(xW,np.transpose((xtest[n]-c))))
-                    yploc[k], var[k] = self.Models[k].predict(xtest[n].reshape(1,self.xdim))
 
                     if Y_prev == []:
                         pass
@@ -392,27 +397,29 @@ class LocalModels():
                     w[k] = 0
                     dcw[k] = float("inf")
                     pass
+                
+            "Pick bestm models"
 
-            if weighted:
-                if bestm > self.M:
-                    h = self.M
-                else:
-                    h = bestm
-            else:
-                h = 1
+            ind = np.argpartition(w[:,0], -h)[-h:]
+            w = w[ind]
+#            dcw = dcw[ind]
 
-
-
-            self.w = w
+            "Make predictions"
+            for i,m in enumerate(ind):
+                yploc[i], var[i] = self.Models[m].predict(xtest[n].reshape(1,self.xdim))
+            
+            
             s = 0
+            
             if Y_prev == []:
                 wv = w/var
             else:
                 wv = w*np.exp(-s*dcw)/var
 
-            wv =np.nan_to_num(wv)
             
-            wv = wv.reshape(self.M,)
+            wv =np.nan_to_num(wv)
+#            print(wv)
+            wv = wv.reshape(h,)
             varmin = np.min(var) # minimum variance of local predictions
             thresh = 0 # 0 uses all models
 
@@ -423,15 +430,15 @@ class LocalModels():
             #     ind = wv > thresh
 
 
-            ind = np.argpartition(wv, -h)[-h:]
-            # ypred[n] = np.dot(np.transpose(wv[ind]), yploc[ind]) / np.sum(wv[ind])
+#            ind = np.argpartition(wv, -h)[-h:]
+            ypred[n] = np.dot(np.transpose(wv), yploc) / np.sum(wv)
 
-            if self.encode:
-                "Normal Weighted mean"
-                ypred[n] = np.dot(np.transpose(wv[ind]), yploc[ind]) / np.sum(wv[ind])
-            else:
-                "Weighted circular mean of predictions"
-                ypred[n] = circstats.mean(yploc,axis = 0,w = wv.reshape(len(wv),1))
+#            if self.encode:
+#                "Normal Weighted mean"
+#                ypred[n] = np.dot(np.transpose(wv[ind]), yploc[ind]) / np.sum(wv[ind])
+#            else:
+#                "Weighted circular mean of predictions"
+#                ypred[n] = circstats.mean(yploc,axis = 0,w = wv.reshape(len(wv),1))
 
             "Debug Prints"
             #print("wv:" + str(wv))
