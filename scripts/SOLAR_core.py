@@ -69,7 +69,7 @@ class LocalModels():
 
         # self.Z.append(m.Z)
         self.W = W
-        self.Ws.append(W)
+#        self.Ws.append(W)
         self.Models.append(m)
 
         X_loc = []
@@ -159,8 +159,8 @@ class LocalModels():
                 else:
                     print("Add New Model")
                     #m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j-1], self.num_inducing, fixTheta = False, driftZ = False,use_old_Z=True)
-#                    m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.mdrift, self.num_inducing, fixTheta = False, fixZ = False, use_old_Z=True)
-                    m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.mdrift, self.num_inducing, fixTheta = False, fixZ = False, use_old_Z=False)
+                    m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.mdrift, self.num_inducing, fixTheta = False, fixZ = False, use_old_Z=True)
+#                    m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.mdrift, self.num_inducing, fixTheta = False, fixZ = False, use_old_Z=False)
 #                    m = self.train_init(self.UpdateX[j],self.UpdateY[j], self.num_inducing)
                     self.Models.append(m)
                     self.LocalData[j][4] = True
@@ -293,13 +293,15 @@ class LocalModels():
 
         else:
             
-            R = self.variance(new_X)/(self.variance(new_X)+self.variance(cur_Z))
-            p = int(M*R)
-            if p == 0:
-                M_old = M-1
-            else:
-                M_old = M - np.min([M-1, p])
-            M_old = M - p
+#            R = self.variance(new_X)/(self.variance(new_X)+self.variance(cur_Z))
+#            p = int(M*R)
+#            if p == 0:
+#                M_old = M-1
+#            else:
+#                M_old = M - np.min([M-1, p])
+#            M_old = M - p
+#            
+            M_old = int(0.7*M)
             M_new = M - M_old
             old_Z = cur_Z[np.random.permutation(M)[0:M_old], :]
             new_Z = new_X[np.random.permutation(new_X.shape[0])[0:M_new], :]
@@ -335,9 +337,12 @@ class LocalModels():
             m_new.kern.fix()
             m_new.likelihood.variance.fix()
 
+#        m_new.likelihood.variance = 7.5e-05
+#        m_new.likelihood.variance.fix()
 
         m_new.optimize(messages = False, ipython_notebook = False)
-#        m_new.optimize_restarts(3, verbose = False, robust = True)
+        
+#        m_new.optimize_restarts(10, verbose = False, robust = True)
         # print('num_inducing: ' + str(len(m_new.Z)))
         m_new.Z.unfix()
         m_new.kern.unfix()

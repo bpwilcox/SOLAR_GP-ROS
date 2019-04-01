@@ -11,7 +11,7 @@ from GPy import likelihoods
 from GPy.core.parameterization.variational import VariationalPosterior
 from GPy.core.parameterization.param import Param
 #from autograd.numpy import sqrt
-from autograd import grad
+from autograd import grad, value_and_grad
 #from ...util.linalg import tdot
 #from ... import util
 from GPy.util.linalg import tdot_numpy
@@ -252,19 +252,69 @@ class OSGPR_VFE(GP):
 
         return mean, var
 
-    def parameters_changed(self):
-#        print("parameters changed")
-#        pass
+
+    def compute_gradient_terms(self):
         
-#        _, _, self.grad_dict = \
-#        self.inference_method.inference(self.kern, self.X, self.Z, self.likelihood,
-#                                        self.Y_normalized, Y_metadata=self.Y_metadata,
-#                                        mean_function=self.mean_function)
+        (Kbf, Kba, Kaa, Kaa_cur, La, Kbb, Lb, D, LD,
+            Lbinv_Kba, LDinv_Lbinv_c, err, Qff) = self._build_common_terms()
         
-        self._log_marginal_likelihood = self.log_likelihood()
+        # Extra needed terms (not necessarily computationally effecient or stable)
+        Saa_inv = np.linalg.inv(self.Su_old)
+        Kaa_inv = np.linalg.inv(self.Kaa_old)
+        Da = Saa_inv - Kaa_inv
+        Da_inv = np.linalg.inv(Da)
+        Kbb_inv = np.linalg.inv(Kbb)
+        Kfb = np.vstack((np.transpose(Kbf), np.transpose(Kba)))
+#        print(np.shape(Kfb))
+        A11 = self.likelihood.variance*np.eye(np.shape(self.X)[0])
+        A12 = np.zeros((np.shape(self.X)[0], np.shape(Da)[0]))
+        A21 = np.zeros((np.shape(Da)[0],np.shape(self.X)[0]))
+        A22 = Da
+        Ey = np.block([[A11, A12], [A21, A22]])
+        y = np.vstack((self.Y, np.matmul(np.matmul(Da,Saa_inv), self.mu_old)))        
+        # Gradients
+    
+        dF_dKff = np.diag(-0.5*(1/self.likelihood.variance)*np.eye(np.shape(self.X)[0])) # should get diag
+
+        dF_dKaa = -0.5 * np.transpose(Da_inv)
         
-#        self._update_gradients()
-        self._update_grads()
+        dF_dKab = 0.5*(np.matmul(np.matmul(Da_inv.T, Kba.T), Kbb_inv.T) \
+                      + np.matmul(np.matmul(Da_inv, Kba.T), Kbb_inv))
+        
+
+        dF_dKfb = -(0.5*np.matmul(np.matmul(np.linalg.inv(Ey.T + np.matmul(np.matmul(Kfb, Kbb_inv.T), Kfb.T)), Kfb), Kbb_inv.T) \
+                    + 0.5*np.matmul(np.matmul(np.linalg.inv(Ey + np.matmul(np.matmul(Kfb, Kbb_inv), Kfb.T)), Kfb), Kbb_inv))
+        
+        T0 = np.linalg.inv(Ey.T + np.matmul(np.matmul(Kfb, Kbb_inv.T), Kfb.T)) 
+        T1 = np.linalg.inv(Ey + np.matmul(np.matmul(Kfb, Kbb_inv), Kfb.T))
+        yTAB0 = np.matmul(np.matmul(np.matmul(y.T, T0), Kfb), Kbb_inv.T)
+        yTAB1 = np.matmul(np.matmul(np.matmul(y.T, T1), Kfb), Kbb_inv)
+        
+        dF_dKfb += 0.5*np.matmul(np.matmul(T0,y),yTAB0) + 0.5*np.matmul(np.matmul(T1,y),yTAB1)
+        
+        dF_dKfb_1 = (0.5/self.likelihood.variance)* (np.matmul(Kbf.T, Kbb_inv.T) + np.matmul(Kbf.T, Kbb_inv))
+        
+        Tbb1 = np.linalg.inv(Ey.T + np.matmul(np.matmul(Kfb, Kbb_inv.T),Kfb.T))
+        yTAT = np.matmul(np.matmul(np.matmul(y.T, Tbb1),Kfb),Kbb_inv.T)
+        beg = np.matmul(np.matmul(np.matmul(Kbb_inv.T,Kfb.T),Tbb1), y)
+        
+        dF_dKbb = -0.5 * np.matmul(beg, yTAT)
+        AT  = np.matmul(Kfb, Kbb_inv)
+        
+        dF_dKbb += 0.5*np.matmul(np.matmul(np.matmul(AT.T,Tbb1),Kfb),Kbb_inv.T)
+        
+        dF_dKbb += -0.5*(1/self.likelihood.variance) *np.matmul(np.matmul(np.matmul(Kbf.T, Kbb_inv).T,Kbf.T),Kbb_inv.T)
+        
+        DAT = np.matmul(np.matmul(Da_inv, Kba.T), Kbb_inv)
+        dF_dKbb += -0.5 * np.matmul(np.matmul(DAT.T, Kba.T), Kbb_inv)
+        
+        # For likelihood variance
+        dF_dTheta = -0.5*np.sum(np.diag(self.kern.K(self.X) - np.matmul(np.matmul(Kbf.T, Kbb_inv), Kbf)))/(self.likelihood.variance**2)
+
+        return dF_dKff, dF_dKaa, dF_dKab, dF_dKfb, dF_dKbb, dF_dTheta, dF_dKfb_1
+
+
+
 #
     def _build_objective_terms(self, Z, kern_variance, kern_lengthscale, noise_variance):
 
@@ -280,24 +330,14 @@ class OSGPR_VFE(GP):
         # a is old inducing points, b is new
         # f is training points
         # s is test points
-#        print(Z)
-#        print(kern_lengthscale)
         Kbf = self.K(kern_variance, kern_lengthscale, Z, self.X)
-#        Kbb = self.rbf_kernel(kern_variance, kern_lengthscale, Z) + anp.eye(Mb, dtype=float_type) * jitter
         Kbb = self.K(kern_variance, kern_lengthscale, Z) + anp.eye(Mb, dtype=float_type) * jitter
-#        print("GPy kernel function")
-#        print(Kbb)
-#        print("custom kernel function")
-#        print(Kbb1)
-#        Kbb = anp.dot(Z, Z.T)
-#        print(np.linalg.eigvalsh(Saa))
-#        print(Z)
+
         
         Kba = self.K(kern_variance, kern_lengthscale, Z, self.Z_old)
         Kaa_cur = self.K(kern_variance, kern_lengthscale, self.Z_old) + anp.eye(Ma, dtype=float_type) * jitter
         Kaa = self.Kaa_old + anp.eye(Ma, dtype=float_type) * jitter
 
-#        err = self.Y - self.mean_function(self.X)
         err = self.Y 
 
         Sainv_ma = anp.linalg.solve(Saa, ma)
@@ -311,9 +351,6 @@ class OSGPR_VFE(GP):
         Lbinv_Kba = solve_triangular(Lb, Kba, lower=True)
         Lbinv_Kbf = solve_triangular(Lb, Kbf, lower=True) / sigma
         d1 = anp.matmul(Lbinv_Kbf, anp.transpose(Lbinv_Kbf))
-#        d1 = Kbb
-        
-        
         
         LSa = anp.linalg.cholesky(Saa)
         Kab_Lbinv = anp.transpose(Lbinv_Kba)
@@ -340,22 +377,21 @@ class OSGPR_VFE(GP):
     def flatten_params(self):
         
         params = np.ndarray.flatten(self.Z) # Size [mxd] 
-#        params = self.kern.lengthscale
         params = np.hstack((params, self.kern.lengthscale))
         params = np.hstack((params, self.kern.variance))
         params = np.hstack((params, self.likelihood.variance))
         
         return params
 
-    def rbf_kernel(self, variance, lengthscale, x, xp = None):
-        output_scale = anp.exp(variance)
-        lengthscales = anp.exp(lengthscale)
-        if xp is None:
-            xp = x
-        diffs = anp.expand_dims(x /lengthscales, 1) - anp.expand_dims(xp/lengthscales, 0)
+    def to_params(self, params):
         
-        return output_scale * anp.exp(-0.5 * anp.sum(diffs**2, axis=2))
-    
+        kern_variance = params[-2]
+        kern_lengthscale = anp.array(params[-2-len(self.kern.lengthscale):-2])
+        noise_variance = params[-1]
+        Z = anp.array(params[:anp.size(self.Z)]).reshape(np.shape(self.Z))        
+        
+        return kern_variance, kern_lengthscale, noise_variance, Z
+
     # Kernel functionality needed for autograd
     def K_of_r(self, r, variance):
         return variance * anp.exp(-0.5 * r**2)
@@ -363,8 +399,6 @@ class OSGPR_VFE(GP):
     def Kdiag(self, X, variance):
 #        ret = np.empty(X.shape[0])
         ret = anp.ones(X.shape[0])*variance
-#        print(X.shape[0])
-#        print(ret)
 #        ret[:] = variance
         return ret
     
@@ -375,8 +409,7 @@ class OSGPR_VFE(GP):
         distances from X to X2, called r.
         K(X, X2) = K_of_r((X-X2)**2)
         """
-        r = self._scaled_dist(lengthscale, X, X2)
-#        print(np.shape(r))
+        r = self._scaled_dist(lengthscale, X, X2)        
         return self.K_of_r(r, variance)
 
     def _scaled_dist(self, lengthscale, X, X2=None):
@@ -388,7 +421,6 @@ class OSGPR_VFE(GP):
         this case we compute the unscaled distance first (in a separate
         function for caching) and divide by lengthscale afterwards
         """
-#        print(X)
         if self.ARD:
             if X2 is not None:
                 X2 = X2 / lengthscale
@@ -423,10 +455,7 @@ class OSGPR_VFE(GP):
 
     def objective(self, params):
         
-        kern_variance = params[-2]
-        kern_lengthscale = anp.array(params[-2-len(self.kern.lengthscale):-2])
-        noise_variance = params[-1]
-        Z = anp.array(params[:anp.size(self.Z)]).reshape(np.shape(self.Z))
+        kern_variance, kern_lengthscale, noise_variance, Z = self.to_params(params)
         
         sigma2 = noise_variance
         N = self.num_data
@@ -443,16 +472,21 @@ class OSGPR_VFE(GP):
         Lainv_ma = solve_triangular(LSa, ma, lower=True)
 
         bound = 0
+        
         # constant term
         bound = -0.5 * N * anp.log(2 * anp.pi)
+        
         # quadratic term
         bound += -0.5 * anp.sum(anp.square(err)) / sigma2
         bound += -0.5 * anp.sum(anp.square(Lainv_ma))
         bound += 0.5 * anp.sum(anp.square(LDinv_Lbinv_c))
+        
 #        # log det term
         bound += -0.5 * N * anp.sum(anp.log(sigma2))
         bound += - anp.sum(anp.log(anp.diag(LD)))
-#
+#        bound += -0.5 * N * anp.sum(anp.log(anp.where(sigma2,sigma2,1.)))
+#        bound += - anp.sum(anp.log(anp.where(anp.diag(LD),anp.diag(LD),1.)))
+        
 #        # delta 1: trace term
         bound += -0.5 * anp.sum(Kfdiag) / sigma2
         bound += 0.5 * anp.sum(anp.diag(Qff))
@@ -470,36 +504,60 @@ class OSGPR_VFE(GP):
                 
         return bound
 
-
-    def _update_grads(self):
-#        print("updating gradients")
-        gradients = self.grad_fun(self.flatten_params())
-#        gradients[0] = 0
-#        print(gradients)
-#        self.likelihood.gradient = gradients[-1]
-        self.likelihood.update_gradients(gradients[-1])
-#        self.kern.lengthscale.gradient = gradients[-2-len(self.kern.lengthscale):-2]
-#        self.kern.gradient = np.hstack((gradients[-2], gradients[-2-len(self.kern.lengthscale):-2]))
-        self.kern.update_gradients_direct(gradients[-2], gradients[-2-len(self.kern.lengthscale):-2])
-#        self.kern.variance.gradient = gradients[-2]
-        self.Z.gradient = np.reshape(gradients[:np.size(self.Z)], np.shape(self.Z))
-#        self.Z.gradient = gradients[:np.size(self.Z)]
+    def parameters_changed(self):
+#        pass
+#        self.posterior, self._log_marginal_likelihood, self.grad_dict = \
+#        self.inference_method.inference(self.kern, self.X, self.Z, self.likelihood,
+#                                        self.Y_normalized, Y_metadata=self.Y_metadata,
+#                                        mean_function=self.mean_function)
         
-#        self.likelihood.update_gradients(self.grad_dict['dL_dthetaL'])
-#        #gradients wrt kernel
-#        self.kern.update_gradients_diag(self.grad_dict['dL_dKdiag'], self.X)
-#        kerngrad = self.kern.gradient.copy()
-#        self.kern.update_gradients_full(self.grad_dict['dL_dKnm'], self.X, self.Z)
-#        kerngrad += self.kern.gradient
-#        self.kern.update_gradients_full(self.grad_dict['dL_dKmm'], self.Z, None)
-#        self.kern.gradient += kerngrad
-#        #gradients wrt Z
-#        self.Z.gradient = self.kern.gradients_X(self.grad_dict['dL_dKmm'], self.Z)
-#        self.Z.gradient += self.kern.gradients_X(self.grad_dict['dL_dKnm'].T, self.Z, self.X)
-            
+        self._log_marginal_likelihood = self.log_likelihood()        
+        self._update_grads()
+#        self._update_grads2()
+#        self._update_gradients()
+        
+    def _update_grads(self):
+        gradients = self.grad_fun(self.flatten_params())
+
+        self.likelihood.update_gradients(gradients[-1])
+        self.kern.update_gradients_direct(gradients[-2], gradients[-2-len(self.kern.lengthscale):-2])
+        self.Z.gradient = np.reshape(gradients[:np.size(self.Z)], np.shape(self.Z))
         self._Zgrad = self.Z.gradient.copy()
 
-
+    def _update_grads2(self):
+        dF_dKff, dF_dKaa, dF_dKab, dF_dKfb, dF_dKbb, dF_dTheta, dF_dKfb_1 = self.compute_gradient_terms()
+        f = np.vstack((self.X, self.Z_old))
+        #gradient wrt likelihood noise variance
+        gradients = self.grad_fun(self.flatten_params())
+        self.likelihood.update_gradients(gradients[-1])
+#        self.likelihood.update_gradients(dF_dTheta)
+        
+        #gradients wrt kernel
+#        self.kern.update_gradients_diag(dF_dKff, self.X)
+#        kerngrad = self.kern.gradient.copy()
+#        self.kern.update_gradients_full(dF_dKaa, self.Z_old, self.Z_old)
+#        kerngrad += self.kern.gradient
+#        self.kern.update_gradients_full(dF_dKab, self.Z_old, self.Z)
+#        kerngrad += self.kern.gradient
+#        self.kern.update_gradients_full(dF_dKbb, self.Z, None)
+#        kerngrad += self.kern.gradient
+#        self.kern.update_gradients_full(dF_dKfb_1, self.X, self.Z)
+#        kerngrad += self.kern.gradient
+#        self.kern.update_gradients_full(dF_dKfb, f, self.Z)      
+#        self.kern.gradient += kerngrad
+        
+        self.kern.update_gradients_direct(gradients[-2], gradients[-2-len(self.kern.lengthscale):-2])
+#        
+#        #gradients wrt Z
+#        self.Z.gradient = self.kern.gradients_X(dF_dKab.T, self.Z, self.Z_old)
+#        self.Z.gradient += self.kern.gradients_X(dF_dKfb.T, self.Z, f)        
+#        self.Z.gradient += self.kern.gradients_X(dF_dKfb_1.T, self.Z, self.X)        
+#        self.Z.gradient += self.kern.gradients_X(dF_dKbb, self.Z)
+        
+        self.Z.gradient = np.reshape(gradients[:np.size(self.Z)], np.shape(self.Z))
+        
+        self._Zgrad = self.Z.gradient.copy()
+        
     def _update_gradients(self):
 #        print("updating gradients")
         self.likelihood.update_gradients(self.grad_dict['dL_dthetaL'])
