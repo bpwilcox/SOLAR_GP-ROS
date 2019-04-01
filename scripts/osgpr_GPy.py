@@ -238,47 +238,48 @@ class OSGPR_VFE(GP):
         return mean, var
 
     def parameters_changed(self):
-        self.posterior, self._log_marginal_likelihood, self.grad_dict = \
-        self.inference_method.inference(self.kern, self.X, self.Z, self.likelihood,
-                                        self.Y_normalized, Y_metadata=self.Y_metadata,
-                                        mean_function=self.mean_function)
-        self._update_gradients()
+        # self.posterior, self._log_marginal_likelihood, self.grad_dict = \
+        # self.inference_method.inference(self.kern, self.X, self.Z, self.likelihood,
+        #                                 self.Y_normalized, Y_metadata=self.Y_metadata,
+        #                                 mean_function=self.mean_function)
+        self._log_marginal_likelihood = self.log_likelihood()
+        # self._update_gradients()
 
-    def _update_gradients(self):
-        self.likelihood.update_gradients(self.grad_dict['dL_dthetaL'])
-        if self.mean_function is not None:
-            self.mean_function.update_gradients(self.grad_dict['dL_dm'], self.X)
+    # def _update_gradients(self):
+    #     self.likelihood.update_gradients(self.grad_dict['dL_dthetaL'])
+    #     if self.mean_function is not None:
+    #         self.mean_function.update_gradients(self.grad_dict['dL_dm'], self.X)
 
-        if isinstance(self.X, VariationalPosterior):
-            #gradients wrt kernel
-            dL_dKmm = self.grad_dict['dL_dKmm']
-            self.kern.update_gradients_full(dL_dKmm, self.Z, None)
-            kerngrad = self.kern.gradient.copy()
-            self.kern.update_gradients_expectations(variational_posterior=self.X,
-                                                    Z=self.Z,
-                                                    dL_dpsi0=self.grad_dict['dL_dpsi0'],
-                                                    dL_dpsi1=self.grad_dict['dL_dpsi1'],
-                                                    dL_dpsi2=self.grad_dict['dL_dpsi2'])
-            self.kern.gradient += kerngrad
+    #     if isinstance(self.X, VariationalPosterior):
+    #         #gradients wrt kernel
+    #         dL_dKmm = self.grad_dict['dL_dKmm']
+    #         self.kern.update_gradients_full(dL_dKmm, self.Z, None)
+    #         kerngrad = self.kern.gradient.copy()
+    #         self.kern.update_gradients_expectations(variational_posterior=self.X,
+    #                                                 Z=self.Z,
+    #                                                 dL_dpsi0=self.grad_dict['dL_dpsi0'],
+    #                                                 dL_dpsi1=self.grad_dict['dL_dpsi1'],
+    #                                                 dL_dpsi2=self.grad_dict['dL_dpsi2'])
+    #         self.kern.gradient += kerngrad
 
-            #gradients wrt Z
-            self.Z.gradient = self.kern.gradients_X(dL_dKmm, self.Z)
-            self.Z.gradient += self.kern.gradients_Z_expectations(
-                               self.grad_dict['dL_dpsi0'],
-                               self.grad_dict['dL_dpsi1'],
-                               self.grad_dict['dL_dpsi2'],
-                               Z=self.Z,
-                               variational_posterior=self.X)
-        else:
-            #gradients wrt kernel
-            self.kern.update_gradients_diag(self.grad_dict['dL_dKdiag'], self.X)
-            kerngrad = self.kern.gradient.copy()
-            self.kern.update_gradients_full(self.grad_dict['dL_dKnm'], self.X, self.Z)
-            kerngrad += self.kern.gradient
-            self.kern.update_gradients_full(self.grad_dict['dL_dKmm'], self.Z, None)
-            self.kern.gradient += kerngrad
-            #gradients wrt Z
-            self.Z.gradient = self.kern.gradients_X(self.grad_dict['dL_dKmm'], self.Z)
-            self.Z.gradient += self.kern.gradients_X(self.grad_dict['dL_dKnm'].T, self.Z, self.X)
-        self._Zgrad = self.Z.gradient.copy()
+    #         #gradients wrt Z
+    #         self.Z.gradient = self.kern.gradients_X(dL_dKmm, self.Z)
+    #         self.Z.gradient += self.kern.gradients_Z_expectations(
+    #                            self.grad_dict['dL_dpsi0'],
+    #                            self.grad_dict['dL_dpsi1'],
+    #                            self.grad_dict['dL_dpsi2'],
+    #                            Z=self.Z,
+    #                            variational_posterior=self.X)
+    #     else:
+    #         #gradients wrt kernel
+    #         self.kern.update_gradients_diag(self.grad_dict['dL_dKdiag'], self.X)
+    #         kerngrad = self.kern.gradient.copy()
+    #         self.kern.update_gradients_full(self.grad_dict['dL_dKnm'], self.X, self.Z)
+    #         kerngrad += self.kern.gradient
+    #         self.kern.update_gradients_full(self.grad_dict['dL_dKmm'], self.Z, None)
+    #         self.kern.gradient += kerngrad
+    #         #gradients wrt Z
+    #         self.Z.gradient = self.kern.gradients_X(self.grad_dict['dL_dKmm'], self.Z)
+    #         self.Z.gradient += self.kern.gradients_X(self.grad_dict['dL_dKnm'].T, self.Z, self.X)
+    #     self._Zgrad = self.Z.gradient.copy()
 
