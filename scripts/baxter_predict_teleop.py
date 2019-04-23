@@ -21,7 +21,6 @@ from copy import copy, deepcopy
 from baxter_core_msgs.msg import EndpointState
 from predictor import SolarPredictor
 
-
 class BaxterPredictor(SolarPredictor):
     def __init__(self):
         arm = rospy.get_param('~arm', 'right')
@@ -35,9 +34,7 @@ class BaxterPredictor(SolarPredictor):
             return False
         return True
 
-
 def pred():
-
     rospy.init_node('predict_node')
 
     Predictor = BaxterPredictor()

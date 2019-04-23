@@ -608,5 +608,3 @@ class OSGPR_VFE(GP):
 #            self.Z.gradient += self.kern.gradients_X(self.grad_dict['dL_dKnm'].T, self.Z, self.X)
             
         self._Zgrad = self.Z.gradient.copy()
->>>>>>> autograd implementation
-
