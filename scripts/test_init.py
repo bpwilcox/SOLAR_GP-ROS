@@ -4,7 +4,8 @@ import rospy
 import rosbag
 from bwrobot.msg import LocalGP, Errors, Params
 from bwrobot.srv import SaveToFile, SetNeutral
-from trainer import Solar_Trainer
+#from trainer import Solar_Trainer
+from baxter_train import BaxterTrainer as Solar_Trainer
 from test_results import TestResults
 from std_srvs.srv import Empty, EmptyRequest
 from std_msgs.msg import Bool

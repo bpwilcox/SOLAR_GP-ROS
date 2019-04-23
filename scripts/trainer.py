@@ -22,7 +22,6 @@ class Solar_Trainer():
         self.num_inducing = num_inducing
         self.wgen = wgen
         self.use_old_Z = use_old_Z
-        self.limb = []
         self.joint_names = []
         self.TrainData = []
         self.rate = []
@@ -39,52 +38,37 @@ class Solar_Trainer():
 
         R = rospy.get_param('~train_pub_rate', 100)
         self.rate = rospy.Rate(R)
-        arm = rospy.get_param('~arm', 'left')
-        x_topic = 'robot/limb/' + arm + '/endpoint_state'
-        y_topic = rospy.get_param('~y_topic', 'robot/joint_states')
-        buffer_duration = rospy.get_param('~buffer_duration', 0.1)
-        buffer_size = rospy.get_param('~buffer_size', 500)
-        joints = rospy.get_param('~joints', ['s0', 's1', 'e1', 'w1'])
-        self.joint_names = [arm + '_' + joint for joint in joints]
-
-        "Initialize"
-        # self.set_neutral()
-        # self.TrainData = DataBuffer(x_topic, y_topic, self.joint_names, buffer_duration, buffer_size)
-        # self.jitter_init(self.njit, self.degrees)
-
-        # XI = np.asarray(self.TrainData.Xexp).reshape(len(self.TrainData.Xexp),3)
-        # YI = np.asarray(self.TrainData.Yexp).reshape(len(self.TrainData.Yexp),len(self.joint_names))
-        # rospy.loginfo("Number of initial points: %s", len(XI))
-        # self.TrainData.clear()
-
-        self.limb = baxter_interface.Limb(arm)
+        self.buffer_duration = rospy.get_param('~buffer_duration', 0.1)
+        self.buffer_size = rospy.get_param('~buffer_size', 500)
+        self.setup_robot()
+        
         XI,YI = self.jitter_robot()
         num_joints = np.size(YI,1)
         self.solar = LocalModels(self.num_inducing, wgen = self.wgen, xdim =3, ndim = num_joints*2)
         self.solar.initializeF(XI,YI)
-        # self.solar.wgen = self.wgen
         SolarMsg = self.constructMsg(self.solar)
         self.pub_solar.publish(SolarMsg)
         
-        self.TrainData = DataBuffer(x_topic, y_topic, self.joint_names, buffer_duration, buffer_size)
+        self.TrainData = DataBuffer(self.x_topic, self.y_topic, self.joint_names, self.buffer_duration, self.buffer_size)
+
+    def setup_robot(self):
+        print("Setup Robot not implemented")
+        return False
 
     def jitter_robot(self):
+        XI = []
+        YI = []
+        print("Jitter Robot not implemented")
         
-        # Set robot to "default" position
-        self.limb.move_to_neutral()
-        YStart = []
-        for joint in self.joint_names:
-            YStart.append(self.limb.joint_angle(joint))
-
-        YStart = np.array(YStart).reshape(1,len(self.joint_names))
-        YI = self.jitter(self.njit, YStart, self.degrees)
-        XI = np.empty([0,3])
-        rospy.Rate(1).sleep()
-
-        for y in YI:        
-            self.limb.move_to_joint_positions(dict(zip(self.joint_names, y.tolist())))
-            end_pose = self.limb.endpoint_pose()
-            XI = np.vstack((XI,np.array([end_pose['position'].x, end_pose['position'].y, end_pose['position'].z]).reshape(1,3)))
+#        self.set_neutral()
+#        self.TrainData = DataBuffer(self.x_topic, self.y_topic, self.joint_names, self.buffer_duration, self.buffer_size)
+#        self.jitter_init(self.njit, self.degrees)
+#        
+#        XI = np.asarray(self.TrainData.Xexp).reshape(len(self.TrainData.Xexp),3)
+#        YI = np.asarray(self.TrainData.Yexp).reshape(len(self.TrainData.Yexp),len(self.joint_names))
+#        rospy.loginfo("Number of initial points: %s", len(XI))
+#        self.TrainData.clear()
+        
         return XI, YI
 
     def jitter(self, n, Y_init, deg = 5):
