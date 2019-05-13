@@ -57,9 +57,6 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
-  Num.msg
-  PointArray.msg
-  PointList.msg
   Arrays.msg
   OSGPR_GP.msg
   LocalGP.msg
@@ -67,17 +64,13 @@ add_message_files(
   FloatHeader.msg
   Params.msg
   Results.msg
-#   Message1.msg
-#   Message2.msg
 )
 
 ## Generate services in the 'srv' folder
 add_service_files(
   FILES
-  EndEffector.srv
 	Jitter.srv
   SaveToFile.srv
-  MoveJoint.srv
   SetNeutral.srv
 )
 

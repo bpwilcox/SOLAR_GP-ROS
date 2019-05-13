@@ -5,7 +5,6 @@ import numpy as np
 from geometry_msgs.msg import Point, PoseStamped
 import GPy
 import time
-import Trajectory
 from TestData import TestTrajectory
 import RobotModels
 import osgpr_GPy
