@@ -13,8 +13,17 @@ from std_msgs.msg import Float64
 import time
 
 class Solar_Trainer():
-    
+    """
+    This class creates a base Trainer module to train a SOLAR_GP model on training input-output pairs.
+    SOLAR_GP models are serialized and sent across a custom topic message interpreted by the SolarPredictor
+    """
     def __init__(self, njit, degrees, num_inducing, wgen, use_old_Z = False):
+        """
+        njit: number of initial jittered ponts
+        degrees: degree range of jittered joints
+        num_inducing: number of inducing points for sparse GP models
+        wgen: weigted threshold for generating new models
+        """
         self.solar = []
         self.pub_solar = rospy.Publisher('solarGP', LocalGP,queue_size=10, latch = True)
         self.njit = njit
@@ -27,6 +36,8 @@ class Solar_Trainer():
         self.rate = []
         self.stop = False
         self.pub_traintime = rospy.Publisher('traintime', Float64, queue_size=10)
+        self.x_topic = ""
+        self.y_topic = ""
 
         rospy.wait_for_service('set_neutral')
         self.set_neutral = rospy.ServiceProxy('set_neutral', SetNeutral)
@@ -40,15 +51,23 @@ class Solar_Trainer():
         self.rate = rospy.Rate(R)
         self.buffer_duration = rospy.get_param('~buffer_duration', 0.1)
         self.buffer_size = rospy.get_param('~buffer_size', 500)
+
+        # Robot-specific setup implemented by derived class
         self.setup_robot()
         
+        # Jitter robot initially
         XI,YI = self.jitter_robot()
         num_joints = np.size(YI,1)
+        
+        # Create and initialize SOLAR_GP model
         self.solar = LocalModels(self.num_inducing, wgen = self.wgen, xdim =3, ndim = num_joints*2)
         self.solar.initializeF(XI,YI)
+
+        # Serialize SOLAR_GP model into custom message and publish 
         SolarMsg = self.constructMsg(self.solar)
         self.pub_solar.publish(SolarMsg)
         
+        # Create Data buffer listening on training input-output topics
         self.TrainData = DataBuffer(self.x_topic, self.y_topic, self.joint_names, self.buffer_duration, self.buffer_size)
 
     def setup_robot(self):
@@ -59,7 +78,8 @@ class Solar_Trainer():
         XI = []
         YI = []
         print("Jitter Robot not implemented")
-        
+
+#        Service based implementation
 #        self.set_neutral()
 #        self.TrainData = DataBuffer(self.x_topic, self.y_topic, self.joint_names, self.buffer_duration, self.buffer_size)
 #        self.jitter_init(self.njit, self.degrees)
@@ -72,13 +92,18 @@ class Solar_Trainer():
         return XI, YI
 
     def jitter(self, n, Y_init, deg = 5):
+        """
+        Randomly sample joint states within specified degree range from initial joint position
+        """
         max_rough=0.0174533
         pert = deg*max_rough * np.random.uniform(-1.,1.,(n,np.size(Y_init,1)))
         Y_start = Y_init + pert
         return Y_start
 
     def constructMsg(self, local):
-        
+        """
+        Serializes SOLAR_GP object into custom ROS topic msg
+        """
         LocMsg = LocalGP()
         L = []
         for count,m in enumerate(local.Models):
@@ -102,8 +127,7 @@ class Solar_Trainer():
             Z_old_arr = []
             mu_old_arr = []
             Su_old_arr = []
-            Kaa_old_arr = []
-    #        
+            Kaa_old_arr = []       
 
             for j in range(0,np.shape(m.X)[0]):
                 X_row = Arrays()
@@ -117,7 +141,7 @@ class Solar_Trainer():
                 Z_row = Arrays()
                 Z_row.array = Z[j,:].tolist()
                 Z_arr.append(Z_row)
-    #       
+       
             for j in range(0,np.shape(Z_old)[0]):
                 
                 Z_old_row = Arrays()
@@ -126,7 +150,6 @@ class Solar_Trainer():
                 Kaa_old_row = Arrays()
                 
                 Z_old_row.array = Z_old[j,:].tolist()
-    #            print(Z_old_row.array)
                 mu_old_row.array = mu_old[j,:].tolist()
                 Su_old_row.array = Su_old[j,:].tolist()
                 Kaa_old_row.array = Kaa_old[j,:].tolist()
@@ -135,7 +158,7 @@ class Solar_Trainer():
                 mu_old_arr.append(mu_old_row)
                 Su_old_arr.append(Su_old_row)
                 Kaa_old_arr.append(Kaa_old_row)            
-    #            
+            
             GP.X = X_arr
             GP.Y = Y_arr
             GP.Z = Z_arr
@@ -147,7 +170,6 @@ class Solar_Trainer():
             L.append(GP)
             
         LocMsg.localGPs= L
-    #    LocMsg.W = np.array(local.mdrift.kern.lengthscale).tolist() 
         LocMsg.W = local.W.diagonal().tolist()
         LocMsg.M = local.M
         LocMsg.xdim = local.xdim
@@ -161,19 +183,22 @@ class Solar_Trainer():
         while not rospy.is_shutdown() and not self.stop:
             t1 = time.time()
 
-            "Get Yexp"
+            # Skip training if data buffer is empty
             if not self.TrainData.Xexp:
                 continue
             else:
                 try:
+                    # Grab training pairs from buffer
                     Xexp = np.asarray(self.TrainData.Xexp).reshape(len(self.TrainData.Xexp),3)
                     Y = np.asarray(self.TrainData.Yexp).reshape(len(self.TrainData.Yexp),len(self.joint_names))
                     Yexp = self.solar.encode_ang(Y)
                 except:
                     continue
 
+            # Clear buffer
             self.TrainData.clear()
             try:
+                # Train drifting model and save trained hyperparameters
                 mdrift = self.solar.doOSGPR(Xexp, Yexp, self.solar.mdrift, 100 ,use_old_Z = True, driftZ = False)
                 mkl = []
                 for j in range(0, self.solar.xdim):
@@ -185,13 +210,18 @@ class Solar_Trainer():
             except:
                 pass
 
+            # Partition training pairs
             self.solar.partition(Xexp.reshape(len(Xexp),self.solar.xdim),Yexp.reshape(len(Yexp),self.solar.ndim))
             try:
+                # Train SOLAR_GP model
                 self.solar.train()
             except:
                 pass
+            # Construct and publish custom SOLAR_GP ROS topic
             LocMsg = self.constructMsg(self.solar)
-            self.pub_solar.publish(LocMsg)  
+            self.pub_solar.publish(LocMsg)
+            
+            # Publish training time
             t2 = time.time()
             self.pub_traintime.publish(t2-t1)
             self.rate.sleep()

@@ -23,9 +23,15 @@ from baxter_core_msgs.msg import EndpointState
 
 
 class SolarPredictor():
+    """
+    This class creates the base Predictor module for SOLAR_GP. While running, requests are made from the 
+    teleoperator service for the next goal pose and any relevant teleop commands. Predictions are published
+    on a topic for the controller
+    """
     def __init__(self, topic):
-
-        # self.TestStream =  xbox_teleop.XboxTel()
+        """
+        topic: name of end effector state topic
+        """
         self.model = LocalModels()
         self.pred_pub = rospy.Publisher('prediction', Arrays, queue_size=10)
         self.curX = []
@@ -36,7 +42,10 @@ class SolarPredictor():
         rospy.wait_for_service('set_teleop_pose')
         self.set_teleop_pose = rospy.ServiceProxy('set_teleop_pose', SetPose)
         
-    def decode_ang(q):
+    def decode_ang(self,q):
+        """
+        Decode angles from sin/cos to radians
+        """
         d = int(np.size(q,1)/2)
         decoding = np.arctan2(q[:,:d], q[:,d:]).reshape(np.size(q,0),d)
         return decoding
@@ -49,7 +58,9 @@ class SolarPredictor():
 
  
     def model_callback(self,LocMsg):
-        
+        """
+        Unserializes SOLAR_GP model messages passed across ROS Topic into SOLAR_GP Objects
+        """
         W = LocMsg.W
         W = np.diag([W[0],W[1],W[2]])
 
@@ -129,28 +140,32 @@ class SolarPredictor():
         
         while not rospy.is_shutdown():
             
+            # Get teleoperation state
             teleop_state = get_teleop()
-    
+            
+            # Check for teleop actions
             if not self.on_teleop(teleop_state):
                 continue
             
+            # Get next goal pose
             data = teleop_state.pose
-    
             xnext = np.array([data.pose.position.x,data.pose.position.y,data.pose.position.z]).reshape(1,3)
+
+            #  If the distance to the next goal point is larger than desired threshold, clip
             v = xnext - self.curX
             norm_v = np.linalg.norm(v)
-            
             if norm_v > d:
                 u = v/norm_v
                 xnext = self.curX + d*u 
-    
+
+            # Predict output joint angles (sin/cos)
             Ypred, _ = self.model.prediction(xnext, Y_prev = Yexp)
             Yexp = Ypred
             if np.isnan(Yexp).any():
                 continue
-    
-            Y = self.decode_ang(Yexp).astype(float)
-            
+
+            # Publish joint angles (radians) 
+            Y = self.decode_ang(Yexp).astype(float) 
             self.pred_pub.publish(Y[0,:].tolist())
             rate.sleep()
         

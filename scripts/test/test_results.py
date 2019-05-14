@@ -11,7 +11,19 @@ from bwrobot.msg import LocalGP, Errors, Results, Params, IntHeader, FloatHeader
 from std_msgs.msg import Time, Header
 
 class TestResults():
+    """
+    This class records and writes a custom Results msg to a rosbag. The results include the parameter configuration,
+    update times of SOLAR_GP models, and the errors between goal pose and actual pose 
+    """
     def __init__(self, test_topic, cur_topic, GP_topic, duration, params = Params(), savefile = 'test.bag'):
+        """
+        test_topic: name for end effector state topic
+        cur_topic: name current goal pose/state topic 
+        GP_topic: name for SOLAR_GP topic
+        duration: period of time before grabbing next result
+        params: Params message of current SOLGAR_GP param configuration 
+        savefile: filename to save results
+        """
         self.test_pose = Pose()
         self.actual_pose = Pose()
         self.results = Results()
@@ -71,6 +83,9 @@ class TestResults():
             self.i+=1
     
     def error_distance(self, pose1, pose2):
+        """
+        Computes squared error/distance between poses
+        """
         x1 = np.array([pose1.position.x, pose1.position.y, pose1.position.z]).reshape(1,3)
         x2 = np.array([pose2.position.x, pose2.position.y, pose2.position.z]).reshape(1,3)
         error = np.dot(x2-x1, np.transpose(x2-x1))

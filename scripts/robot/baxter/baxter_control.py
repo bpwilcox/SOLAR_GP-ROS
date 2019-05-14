@@ -10,12 +10,19 @@ from teleop_utils.srv import GetTeleop, GetTeleopResponse
 from robot_controller import RobotController
 
 class BaxterController(RobotController):
+    """
+    This class implements the RobotController base class for the Baxter Robot
+    """
     def __init__(self, joint_names, joint_topic):
         self.arm = rospy.get_param('~arm', 'right')
         joint_names = [self.arm + '_' + joint for joint in joint_names] 
         super().__init__(joint_names, joint_topic)
+
+        # Set smoothness of angle filter
         self.coef = rospy.get_param('~filter_coef', 0.1)
-        self.limb = baxter_interface.Limb(self.arm)
+        # Adds API support for controlling Baxter arm
+        self.limb = baxter_interface.Limb(self.arm) 
+        # Adds API support for controlling Baxter gripper
         self.gripper = baxter_interface.Gripper(self.arm)
 
     def jitter(self, njit, deg):
@@ -29,6 +36,9 @@ class BaxterController(RobotController):
         return True
     
     def set_neutral(self):
+        """
+        Command Baxter to Neutral arm position
+        """
         self.limb.move_to_neutral()
         self.nextY = self.currentY[:]
         return True
@@ -82,6 +92,9 @@ class BaxterController(RobotController):
         return True
 
     def on_teleop(self, state):
+        """
+        Triggers jitter, neutral, or gripper open/close on teleoperator signal
+        """
         if state.button6:
             self.jitter(5,3)
         if state.button7:

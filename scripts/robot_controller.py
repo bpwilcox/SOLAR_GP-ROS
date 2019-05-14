@@ -7,15 +7,27 @@ from bwrobot.srv import Jitter, SetNeutral
 from teleop_utils.srv import GetTeleop, GetTeleopResponse
 
 class RobotController():
+    """
+    This base Controller class controls a robot to a commanded joint state from the Predictor.
+    Special teleoperator commands can be triggered if implemented.
+    """
     def __init__(self, joint_names, joint_topic):
+        """
+        joint_names: list of strings for joint names
+        joint_topic: name of joint state topic
+        """
         self.joint_names = joint_names
         self.nextY = list()
         self.currentY = list()
         self.joint_angles = dict()
+
+        # Exposes a service for commanding robot to go to neutral position
         self.neutral_service = rospy.Service('set_neutral', SetNeutral, self.neutral_callback)
+        # Exposes a service for commanding robot to jitter given a number of points and degree range
         self.jit_service= rospy.Service('jitter', Jitter, self.jitter_callback)
-        rospy.Subscriber('prediction', Arrays, self.pred_callback)
-        rospy.Subscriber(joint_topic, JointState, self.curr_callback, queue_size = 10)
+
+        rospy.Subscriber('prediction', Arrays, self.pred_callback) # Subscribes to current joint prediction
+        rospy.Subscriber(joint_topic, JointState, self.curr_callback, queue_size = 10) # Subscribes to current joint state
         
     def neutral_callback(self, req):
         self.set_neutral()
@@ -60,9 +72,10 @@ class RobotController():
         teleop_state = GetTeleopResponse()
         
         rospy.wait_for_message('prediction',Arrays)
-        
+        # Check for on teleop state commands
         while not rospy.is_shutdown():
             teleop_state = get_teleop()
             if not self.on_teleop(teleop_state):
                 continue
+            # Send control commands to robot to move joints
             self.move_joints()

@@ -10,7 +10,16 @@ from std_msgs.msg import Header, Bool
 from std_srvs.srv import Empty, EmptyResponse
 
 class TrajectorySender():
+    """
+    This class mimics a Teleoperator interface and updates current goal poses
+    from a trajactory playback rosbag on a timer
+    """
     def __init__(self, filename, rate):
+        """
+        filename: name of bag file for trajectory. Contains a Path
+        rate: rate at which to update goal pose
+        """
+
         self.filename = filename
         self.button1 = False
         self.button2 = True
@@ -75,8 +84,11 @@ class TrajectorySender():
         
     def get_teleop(self,req):
         return self.nextPose, self.button1, self.button2, self.button3, self.button4, self.button5, self.button6, self.button7, self.button8
-    
+
     def restart(self, req):
+        """
+        Restarts trajectory path from the beginning
+        """
         self.i = 0
         # self.button8 = False
         return EmptyResponse()
@@ -90,6 +102,7 @@ class TrajectorySender():
         self.running = False
         self.button8 = True
         return EmptyResponse()
+
 # def sender():
 
 #     rospy.init_node('trajectory_sender_node')

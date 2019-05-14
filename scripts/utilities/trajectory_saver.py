@@ -8,9 +8,13 @@ import rosbag
 
 
 class TrajectorySaver():
+    """
+    This class saves trajectories from a Path topic to a rosbag
+    """
     def __init__(self, path_topic):
         rospy.Subscriber(path_topic, Path, self.path_callback, queue_size = 10)
         self.currentPath = Path()
+        # Exposes service to save a current Path
         self.service= rospy.Service('save_trajectory',SaveToFile, self.save_callback)
     def path_callback(self, msg):
         self.currentPath = msg
@@ -30,8 +34,6 @@ def saver():
     path_topic = rospy.get_param('~path_topic', 'teleop_path')
     TrajectorySaver(path_topic)
     rospy.spin()
-
-
 
 if __name__ == '__main__':
     try:

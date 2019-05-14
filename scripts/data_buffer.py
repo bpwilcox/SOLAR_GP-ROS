@@ -8,7 +8,17 @@ from copy import deepcopy, copy
 from baxter_core_msgs.msg import EndpointState
 
 class DataBuffer():
+    """
+    This class creates a buffer for training input-output pairs
+    """
     def __init__(self, x_topic, y_topic, joint_names, duration, max_buffer_size = float('inf')):
+        """
+        x_topic: string of input topic name (endpoint state)
+        y_topic: string of output topic name (joint states)
+        joint_names: list of strings for joint names
+        duration: period of time to buffer next training pair
+        max_buffer_size: number of training pairs to hold in buffer
+        """
         rospy.Subscriber(x_topic, EndpointState, self.x_callback, queue_size = 10)
         rospy.Subscriber(y_topic, JointState, self.y_callback, queue_size = 10)
         self.x_state = None

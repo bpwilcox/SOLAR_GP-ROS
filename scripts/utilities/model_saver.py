@@ -8,6 +8,9 @@ import rosbag
 
 
 class ModelSaver():
+    """
+    This clas saves a SOLAR_GP model custom ROS topic msg to a rosbag
+    """
     def __init__(self, model_topic):
         rospy.Subscriber(model_topic, LocalGP, self.model_callback, queue_size = 10)
         self.model = LocalGP
