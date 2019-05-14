@@ -15,7 +15,6 @@ from teleop_utils import xbox_teleop
 from std_msgs.msg import Float64
 from bwrobot.srv import *
 from bwrobot.msg import *
-import baxter_interface
 from copy import copy, deepcopy
 from baxter_core_msgs.msg import EndpointState
     
