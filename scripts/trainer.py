@@ -3,6 +3,8 @@
 import rospy
 import numpy as np
 import GPy
+import sys
+sys.path.insert(0, '/home/bpwilcox/catkin_ws/src/SOLAR_GP-ROS/scripts/core')
 from SOLAR_core import LocalModels
 
 from bwrobot.srv import Jitter, SetNeutral

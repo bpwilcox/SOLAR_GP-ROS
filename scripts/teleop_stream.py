@@ -3,6 +3,8 @@
 import rospy
 import numpy as np
 from teleop_utils import xbox_teleop, phantom_teleop
+import sys
+sys.path.insert(0, '/home/bpwilcox/catkin_ws/src/SOLAR_GP-ROS/scripts/utilities')
 import trajectory_sender
 
 def teleop():

@@ -1,6 +1,8 @@
 import numpy as np
 import GPy
 import osgpr_GPy
+import sys
+sys.path.insert(0, '/home/bpwilcox/catkin_ws/src/SOLAR_GP-ROS/scripts/utilities')
 import circstats
 from copy import copy, deepcopy
 class LocalModels():

@@ -6,7 +6,7 @@ from sensor_msgs.msg import JointState
 from bwrobot.srv import Jitter, SetNeutral
 from teleop_utils.srv import GetTeleop, GetTeleopResponse
 
-class RobotController():
+class RobotController(object):
     """
     This base Controller class controls a robot to a commanded joint state from the Predictor.
     Special teleoperator commands can be triggered if implemented.

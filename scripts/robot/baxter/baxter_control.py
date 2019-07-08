@@ -7,6 +7,8 @@ import baxter_interface
 import baxter_dataflow
 from baxter_interface import settings
 from teleop_utils.srv import GetTeleop, GetTeleopResponse
+import sys
+sys.path.insert(0, '/home/bpwilcox/catkin_ws/src/SOLAR_GP-ROS/scripts/')
 from robot_controller import RobotController
 
 class BaxterController(RobotController):
@@ -16,7 +18,7 @@ class BaxterController(RobotController):
     def __init__(self, joint_names, joint_topic):
         self.arm = rospy.get_param('~arm', 'right')
         joint_names = [self.arm + '_' + joint for joint in joint_names] 
-        super().__init__(joint_names, joint_topic)
+        super(RobotController, self).__init__(joint_names, joint_topic)
 
         # Set smoothness of angle filter
         self.coef = rospy.get_param('~filter_coef', 0.1)

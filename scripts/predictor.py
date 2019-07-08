@@ -5,8 +5,8 @@ import numpy as np
 from geometry_msgs.msg import Point, PoseStamped
 import GPy
 import time
-from TestData import TestTrajectory
-import RobotModels
+import sys
+sys.path.insert(0, '/home/bpwilcox/catkin_ws/src/SOLAR_GP-ROS/scripts/core')
 import osgpr_GPy
 from SOLAR_core import LocalModels
 from sensor_msgs.msg import JointState

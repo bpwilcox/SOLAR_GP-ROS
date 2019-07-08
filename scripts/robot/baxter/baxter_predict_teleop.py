@@ -5,10 +5,6 @@ import numpy as np
 from geometry_msgs.msg import Point, PoseStamped
 import GPy
 import time
-from TestData import TestTrajectory
-import RobotModels
-import osgpr_GPy
-from SOLAR_core import LocalModels
 from sensor_msgs.msg import JointState
 from teleop_utils.srv import GetTeleop, GetTeleopResponse, SetPose
 from teleop_utils import xbox_teleop
@@ -18,6 +14,8 @@ from bwrobot.msg import *
 import baxter_interface
 from copy import copy, deepcopy
 from baxter_core_msgs.msg import EndpointState
+import sys
+sys.path.insert(0, '/home/bpwilcox/catkin_ws/src/SOLAR_GP-ROS/scripts/')
 from predictor import SolarPredictor
 
 

@@ -5,9 +5,6 @@ import numpy as np
 from geometry_msgs.msg import Point
 import GPy
 import time
-from TestData import TestTrajectory
-import RobotModels
-from SOLAR_core import LocalModels
 
 from sensor_msgs.msg import JointState
 
@@ -15,6 +12,8 @@ from std_msgs.msg import Float64
 from bwrobot.srv import Jitter, MoveJoint, MoveJointRequest
 from bwrobot.msg import LocalGP, OSGPR_GP, Arrays
 import baxter_interface
+import sys
+sys.path.insert(0, '/home/bpwilcox/catkin_ws/src/SOLAR_GP-ROS/scripts/')
 from data_buffer import DataBuffer
 from trainer import Solar_Trainer
 
