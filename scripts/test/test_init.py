@@ -5,6 +5,8 @@ import rosbag
 from bwrobot.msg import LocalGP, Errors, Params
 from bwrobot.srv import SaveToFile, SetNeutral
 #from trainer import Solar_Trainer
+import sys
+sys.path.insert(0, '/home/bpwilcox/catkin_ws/src/SOLAR_GP-ROS/scripts/robot/baxter')
 from baxter_train import BaxterTrainer as Solar_Trainer
 from test_results import TestResults
 from std_srvs.srv import Empty, EmptyRequest
