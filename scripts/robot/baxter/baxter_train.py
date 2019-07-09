@@ -22,7 +22,7 @@ class BaxterTrainer(Solar_Trainer):
     Baxter implementation of Solar_Trainer
     """
     def __init__(self, njit, degrees, num_inducing, wgen, use_old_Z = False):
-        super().__init__(njit, degrees, num_inducing, wgen, use_old_Z)        
+        Solar_Trainer.__init__(self, njit, degrees, num_inducing, wgen, use_old_Z)        
 
     def setup_robot(self):
         arm = rospy.get_param('~arm', 'left')

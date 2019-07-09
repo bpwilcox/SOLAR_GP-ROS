@@ -15,11 +15,9 @@ class BaxterController(RobotController):
     """
     This class implements the RobotController base class for the Baxter Robot
     """
-    def __init__(self, joint_names, joint_topic):
-        self.arm = rospy.get_param('~arm', 'right')
-        joint_names = [self.arm + '_' + joint for joint in joint_names] 
-        super(RobotController, self).__init__(joint_names, joint_topic)
-
+    def __init__(self, arm, joint_names, joint_topic):
+        RobotController.__init__(self, joint_names, joint_topic)
+        self.arm = arm
         # Set smoothness of angle filter
         self.coef = rospy.get_param('~filter_coef', 0.1)
         # Adds API support for controlling Baxter arm
@@ -115,8 +113,10 @@ def actuate():
     
     joint_names = rospy.get_param('~joints', ['s0', 's1', 'e1', 'w1'])
     joint_topic = rospy.get_param('~y_topic', 'robot/joint_states')
-    
-    MoveRobot = BaxterController(joint_names, joint_topic)
+    arm = rospy.get_param('~arm', 'right')
+    joint_names = [arm + '_' + joint for joint in joint_names]
+
+    MoveRobot = BaxterController(arm, joint_names, joint_topic)
     MoveRobot.run()
         
 if __name__ == '__main__':

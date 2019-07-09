@@ -7,7 +7,7 @@
   <arg name="which_arm" default ="left" />
   <arg name="joint_names" default ="[s0, s1, e1, w1]" />
   <arg name="teleop_device" default ="bag" />
-  <arg name="bag_file" default ="/home/bpwilcox/catkin_ws/src/SOLAR_GP-ROS/bags/trajectories/name.bag" />
+  <arg name="bag_file" default ="/home/bpwilcox/catkin_ws/src/SOLAR_GP-ROS/bags/trajectories/test_left_1.bag" />
   <arg name="filter_coefficient" default="0.2" />
   <arg name="max_pred_distance" default="1" />
   <arg name="jit_init" default ="25" />

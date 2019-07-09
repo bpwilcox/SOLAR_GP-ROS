@@ -26,7 +26,7 @@ class BaxterPredictor(SolarPredictor):
     def __init__(self):
         arm = rospy.get_param('~arm', 'right')
         end_effector_topic = 'robot/limb/' + arm + '/endpoint_state'        
-        super().__init__(end_effector_topic)        
+        SolarPredictor.__init__(self, end_effector_topic)        
     
     def on_teleop(self, state):
         if state.button3:
