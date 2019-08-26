@@ -14,6 +14,9 @@ from data_buffer import DataBuffer
 from std_msgs.msg import Float64
 import time
 
+import warnings
+warnings.simplefilter('always', UserWarning)
+
 class Solar_Trainer():
     """
     This class creates a base Trainer module to train a SOLAR_GP model on training input-output pairs.
@@ -51,7 +54,7 @@ class Solar_Trainer():
 
         R = rospy.get_param('~train_pub_rate', 100)
         self.rate = rospy.Rate(R)
-        self.buffer_duration = rospy.get_param('~buffer_duration', 0.1)
+        self.buffer_duration = rospy.get_param('~buffer_duration', 0.01)
         self.buffer_size = rospy.get_param('~buffer_size', 500)
 
         # Robot-specific setup implemented by derived class
@@ -117,19 +120,13 @@ class Solar_Trainer():
             GP.ymean = local.LocalData[count][3][0].tolist()
             GP.numloc = local.LocalData[count][0]
             Z = np.array(m.Z)
-            Z_old = np.array(m.Z_old)
-            mu_old = np.array(m.mu_old)
-            Su_old = np.array(m.Su_old)
-            Kaa_old = np.array(m.Kaa_old)
+
             
             
             X_arr = []
             Y_arr = []
             Z_arr = []
-            Z_old_arr = []
-            mu_old_arr = []
-            Su_old_arr = []
-            Kaa_old_arr = []       
+    
 
             for j in range(0,np.shape(m.X)[0]):
                 X_row = Arrays()
@@ -143,23 +140,66 @@ class Solar_Trainer():
                 Z_row = Arrays()
                 Z_row.array = Z[j,:].tolist()
                 Z_arr.append(Z_row)
-       
-            for j in range(0,np.shape(Z_old)[0]):
+    
+
+            # Z_old = np.array(m.Z_old)
+            # mu_old = np.array(m.mu_old)
+            # Su_old = np.array(m.Su_old)
+            # Kaa_old = np.array(m.Kaa_old)
+            # Z_old_arr = []
+            # mu_old_arr = []
+            # Su_old_arr = []
+            # Kaa_old_arr = []   
+
+            # for j in range(0,np.shape(Z_old)[0]):
                 
-                Z_old_row = Arrays()
-                mu_old_row = Arrays()
-                Su_old_row = Arrays()
-                Kaa_old_row = Arrays()
+            #     Z_old_row = Arrays()
+            #     mu_old_row = Arrays()
+            #     Su_old_row = Arrays()
+            #     Kaa_old_row = Arrays()
                 
-                Z_old_row.array = Z_old[j,:].tolist()
-                mu_old_row.array = mu_old[j,:].tolist()
-                Su_old_row.array = Su_old[j,:].tolist()
-                Kaa_old_row.array = Kaa_old[j,:].tolist()
+            #     Z_old_row.array = Z_old[j,:].tolist()
+            #     mu_old_row.array = mu_old[j,:].tolist()
+            #     Su_old_row.array = Su_old[j,:].tolist()
+            #     Kaa_old_row.array = Kaa_old[j,:].tolist()
                 
-                Z_old_arr.append(Z_old_row)
-                mu_old_arr.append(mu_old_row)
-                Su_old_arr.append(Su_old_row)
-                Kaa_old_arr.append(Kaa_old_row)            
+            #     Z_old_arr.append(Z_old_row)
+            #     mu_old_arr.append(mu_old_row)
+            #     Su_old_arr.append(Su_old_row)
+            #     Kaa_old_arr.append(Kaa_old_row)
+
+            try:
+                Z_old = np.array(m.Z_old)
+                mu_old = np.array(m.mu_old)
+                Su_old = np.array(m.Su_old)
+                Kaa_old = np.array(m.Kaa_old)
+                Z_old_arr = []
+                mu_old_arr = []
+                Su_old_arr = []
+                Kaa_old_arr = []   
+
+                for j in range(0,np.shape(Z_old)[0]):
+                    
+                    Z_old_row = Arrays()
+                    mu_old_row = Arrays()
+                    Su_old_row = Arrays()
+                    Kaa_old_row = Arrays()
+                    
+                    Z_old_row.array = Z_old[j,:].tolist()
+                    mu_old_row.array = mu_old[j,:].tolist()
+                    Su_old_row.array = Su_old[j,:].tolist()
+                    Kaa_old_row.array = Kaa_old[j,:].tolist()
+                    
+                    Z_old_arr.append(Z_old_row)
+                    mu_old_arr.append(mu_old_row)
+                    Su_old_arr.append(Su_old_row)
+                    Kaa_old_arr.append(Kaa_old_row)
+            except:
+                warnings.warn("warning during message construction")
+                Z_old_arr = Arrays()
+                mu_old_arr = Arrays()
+                Su_old_arr = Arrays()
+                Kaa_old_arr = Arrays()
             
             GP.X = X_arr
             GP.Y = Y_arr
@@ -181,24 +221,34 @@ class Solar_Trainer():
         return LocMsg
 
     def run(self):
-        
+        should_clear = True
         while not rospy.is_shutdown() and not self.stop:
             t1 = time.time()
 
             # Skip training if data buffer is empty
             if not self.TrainData.Xexp:
+                # warnings.warn("Empty Data")
+                # should_clear = False
                 continue
             else:
                 try:
                     # Grab training pairs from buffer
                     Xexp = np.asarray(self.TrainData.Xexp).reshape(len(self.TrainData.Xexp),3)
                     Y = np.asarray(self.TrainData.Yexp).reshape(len(self.TrainData.Yexp),len(self.joint_names))
+                    if np.shape(Xexp)[0] != np.shape(Y)[0]:
+                        continue
+                    #     dmin = min(np.shape(Xexp)[0], np.shape(Y)[0])
+                    #     Xexp = Xexp[:dmin, 3]
+                    #     Y = Y[:dmin, len(self.joint_names)]
                     Yexp = self.solar.encode_ang(Y)
                 except:
+                    # warnings.warn("warning during data collection")
+                    # should_clear = False
                     continue
 
             # Clear buffer
-            self.TrainData.clear()
+            if should_clear:
+                self.TrainData.clear()
             try:
                 # Train drifting model and save trained hyperparameters
                 mdrift = self.solar.doOSGPR(Xexp, Yexp, self.solar.mdrift, 100 ,use_old_Z = True, driftZ = False)
@@ -210,7 +260,11 @@ class Solar_Trainer():
                 self.solar.W = W
                 self.solar.mdrift = mdrift
             except:
+                warnings.warn("warning during drift model training")
+                # warnings.warn("data size: " + str(np.shape(Xexp)[0]))
+                # should_clear = False
                 pass
+                # pass
 
             # Partition training pairs
             self.solar.partition(Xexp.reshape(len(Xexp),self.solar.xdim),Yexp.reshape(len(Yexp),self.solar.ndim))
@@ -218,11 +272,19 @@ class Solar_Trainer():
                 # Train SOLAR_GP model
                 self.solar.train()
             except:
-                pass
+                warnings.warn("warning during local models training")
+                warnings.warn("data size: " + str(np.shape(Xexp)[0]))
+                should_clear = False
+                continue
+            #     # pass
             # Construct and publish custom SOLAR_GP ROS topic
+            # try:
             LocMsg = self.constructMsg(self.solar)
             self.pub_solar.publish(LocMsg)
+            # except:
+            #     pass
             
+            should_clear = True
             # Publish training time
             t2 = time.time()
             self.pub_traintime.publish(t2-t1)

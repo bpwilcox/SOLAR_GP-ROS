@@ -33,7 +33,8 @@ float_type = np.float64
 #tf.zeros(tf.stack([tf.shape(X)[0], 1]), dtype=float_type)
 #np.zeros(np.vstack((np.shape(X)[0],1)),dtype= float_type)
 
-
+import warnings
+warnings.simplefilter('always', UserWarning)
 
 class OSGPR_VFE(GP):
     """
@@ -44,7 +45,7 @@ class OSGPR_VFE(GP):
     NIPS 2017
     """
 
-    def __init__(self, X, Y, kern, mu_old, Su_old, Kaa_old, Z_old, Z, mean_function=None):
+    def __init__(self, X, Y, kern, mu_old, Su_old, Kaa_old, Z_old, Z, likelihood = likelihoods.Gaussian(), mean_function=None):
         """
         X is a data matrix, size N x D
         Y is a data matrix, size N x R
@@ -65,9 +66,9 @@ class OSGPR_VFE(GP):
         self.Y = Param('output',Y)
         
         
-        likelihood = likelihoods.Gaussian()
+        # likelihood = likelihoods.Gaussian()
 #        GPModel.__init__(self, X, Y, kern, likelihood, mean_function)
-        GP.__init__(self, X, Y, kern, likelihood, mean_function, inference_method = GPy.inference.latent_function_inference.VarDTC())
+        GP.__init__(self, X, Y, kern, likelihood, mean_function, inference_method = None)
 #        GP.__init__(self, X, Y, kern, likelihood, mean_function)
      
 #        SparseGP.__init__(self, X, Y, Z, kern, likelihood, mean_function, inference_method = GPy.inference.latent_function_inference.VarDTC())
@@ -92,7 +93,7 @@ class OSGPR_VFE(GP):
         Mb = np.shape(self.Z)[0]
         Ma = self.M_old
 #        jitter = settings.numerics.jitter_level
-        jitter = 1e-4
+        jitter = 1e-3
         sigma2 = self.likelihood.variance
         sigma = np.sqrt(sigma2)
 
@@ -143,7 +144,7 @@ class OSGPR_VFE(GP):
 
         D = np.eye(Mb, dtype=float_type) + d1 + d2 - d3
         D = D + np.eye(Mb, dtype=float_type) * jitter
-        
+    
 #        E = np.linalg.eigvalsh(D)
 #        
 #        print(np.any(np.linalg.eigvalsh(D) < 0))
@@ -216,7 +217,7 @@ class OSGPR_VFE(GP):
     
     def log_likelihood(self):
 #        print("calling log_likelihood")
-        return self.objective(self.flatten_params())
+        return self._log_marginal_likelihood
     
     def predict(self, Xnew, full_cov=False):
         """
@@ -225,7 +226,7 @@ class OSGPR_VFE(GP):
         """
 
         # jitter = settings.numerics.jitter_level
-        jitter = 1e-4
+        jitter = 1e-3
 
         # a is old inducing points, b is new
         # f is training points
@@ -320,7 +321,7 @@ class OSGPR_VFE(GP):
 
         Mb = anp.shape(Z)[0]
         Ma = self.M_old
-        jitter = 1e-4
+        jitter = 1e-3
         sigma2 = noise_variance
         sigma = anp.sqrt(sigma2)
 
@@ -511,18 +512,20 @@ class OSGPR_VFE(GP):
 #                                        self.Y_normalized, Y_metadata=self.Y_metadata,
 #                                        mean_function=self.mean_function)
         
-        self._log_marginal_likelihood = self.log_likelihood()        
+        self._log_marginal_likelihood = self.objective(self.flatten_params())        
         self._update_grads()
 #        self._update_grads2()
 #        self._update_gradients()
         
     def _update_grads(self):
-        gradients = self.grad_fun(self.flatten_params())
-
-        self.likelihood.update_gradients(gradients[-1])
-        self.kern.update_gradients_direct(gradients[-2], gradients[-2-len(self.kern.lengthscale):-2])
-        self.Z.gradient = np.reshape(gradients[:np.size(self.Z)], np.shape(self.Z))
-        self._Zgrad = self.Z.gradient.copy()
+        try:
+            gradients = self.grad_fun(self.flatten_params())
+            self.likelihood.update_gradients(gradients[-1])
+            self.kern.update_gradients_direct(gradients[-2], gradients[-2-len(self.kern.lengthscale):-2])
+            self.Z.gradient = np.reshape(gradients[:np.size(self.Z)], np.shape(self.Z))
+            self._Zgrad = self.Z.gradient.copy()
+        except:
+            warnings.warn("warning during gradient update")
 
     def _update_grads2(self):
         dF_dKff, dF_dKaa, dF_dKab, dF_dKfb, dF_dKbb, dF_dTheta, dF_dKfb_1 = self.compute_gradient_terms()

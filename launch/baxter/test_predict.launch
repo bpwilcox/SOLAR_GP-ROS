@@ -1,7 +1,7 @@
 <launch>
 
   <arg name="js_pub_rate" default="100" />
-  <arg name="tel_pub_rate" default="40" />
+  <arg name="tel_pub_rate" default="10" />
   <arg name="sequential" default="false" />
   <arg name="dev" default="/dev/input/js0" />
   <arg name="which_arm" default ="left" />

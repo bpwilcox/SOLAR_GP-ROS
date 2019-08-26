@@ -84,10 +84,11 @@ class TestStarter():
         self.stop_bag()
         # self.DataCollector.stop()
 
-    def end_test(self):
+    def end_test(self, save = True):
         rospy.loginfo("Ending Test")
         self.DataCollector.stop()
-        self.DataCollector.save_data()
+        if save:
+            self.DataCollector.save_data()
 
 
 def start():
@@ -96,8 +97,8 @@ def start():
     "Model Parameters"
     njit = rospy.get_param('~njit', 25)
     deg = rospy.get_param('~degree', 3)
-    num_inducing = rospy.get_param('~num_inducing', 50)
-    w_gen = rospy.get_param('~wgen', 0.98)
+    num_inducing = rospy.get_param('~num_inducing', 25)
+    w_gen = rospy.get_param('~wgen', 0.8)
     param = Params()
     param.njit = njit
     param.inducing = num_inducing
@@ -116,14 +117,14 @@ def start():
     Test = TestStarter(Trainer, DataCollector)
     directory = '/home/bpwilcox/catkin_ws/src/SOLAR_GP-ROS/bags/tests/'
 
-    num_inducing = range(15,50,5)
-    w_gen = np.linspace(0.8, 0.985, 5)
+    # num_inducing = range(25,50,5)
+    # w_gen = np.linspace(0.8, 0.985, 5)
 
     num_inducing = [25]
-    w_gen = [0.892, 0.939]
+    w_gen = [0.939]
 
     test_num = 1
-    redos = 2
+    redos = 1
     for inducing in num_inducing:
         for thresh in w_gen:
             Test.Trainer.num_inducing = inducing
@@ -136,19 +137,28 @@ def start():
             param.degrees = deg
             param.wgen = thresh
             Test.DataCollector.results.params = param
+            # try:
             Test.start_test()
             Test.end_test()
+            # except:
+                # Test.end_test(False)
             test_num +=1
             for times in range (0, redos):
                 rospy.loginfo("Starting Test # %s out of %s", test_num, (redos+2)* len(num_inducing)*len(w_gen))
-                Test.DataCollector.filename = directory + 'test_redo_'+ time.strftime("%Y%m%d-%H%M%S") + '.bag'            
+                Test.DataCollector.filename = directory + 'test_redo_'+ time.strftime("%Y%m%d-%H%M%S") + '.bag'
+                # try:
                 Test.run_again()
                 Test.end_test()
+                # except:
+                    # Test.end_test(False)
                 test_num +=1
             rospy.loginfo("Starting Test # %s out of %s", test_num, (redos+2)* len(num_inducing)*len(w_gen))
             Test.DataCollector.filename = directory + 'test_no_train_'+ time.strftime("%Y%m%d-%H%M%S") + '.bag'
+            # try:
             Test.run_no_train()
             Test.end_test()
+            # except:
+                # Test.end_test(False)
             test_num +=1
 
     # for test_num in range(0, 3):

@@ -19,8 +19,8 @@ class DataBuffer():
         duration: period of time to buffer next training pair
         max_buffer_size: number of training pairs to hold in buffer
         """
-        rospy.Subscriber(x_topic, EndpointState, self.x_callback, queue_size = 10)
-        rospy.Subscriber(y_topic, JointState, self.y_callback, queue_size = 10)
+        rospy.Subscriber(x_topic, EndpointState, self.x_callback, queue_size = 1)
+        rospy.Subscriber(y_topic, JointState, self.y_callback, queue_size = 1)
         self.x_state = None
         self.y_state = None
         self.joint_angles = dict()
@@ -29,7 +29,7 @@ class DataBuffer():
         self.Xexp = list()
         self.Yexp = list()
         self.y_prev = []
-        self.thresh = 0.000001
+        self.thresh = 0.001
         rospy.Timer(rospy.Duration(duration), self.timer_callback)
 
     def x_callback(self, data):
@@ -75,3 +75,8 @@ class DataBuffer():
     def clear(self):
         del self.Xexp[:]
         del self.Yexp[:]
+    
+    def add_data(self, X, Y):
+        self.Xexp.extend(X)
+        self.Yexp.extend(Y)
+

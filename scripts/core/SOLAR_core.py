@@ -9,12 +9,15 @@ from copy import copy, deepcopy
 import warnings
 
 warnings.filterwarnings("error", message="overflow encountered in true_divide")
+warnings.filterwarnings("error", message="overflow encountered in divide")
 warnings.filterwarnings("error", message="overflow encountered in square")
 warnings.filterwarnings("error", message="overflow encountered in add")
 warnings.filterwarnings("error", message="overflow encountered in multiply")
+warnings.filterwarnings("error", message="overflow encountered in expm1")
 warnings.filterwarnings("error", message="invalid value encountered in add")
 warnings.filterwarnings("error", message="invalid value encountered in true_divide")
 warnings.filterwarnings("error", message="divide by zero encountered in double_scalars")
+warnings.filterwarnings("error", message="divide by zero encountered in divide")
 
 class LocalModels():
 
@@ -318,43 +321,43 @@ class LocalModels():
         return Z
 
     def doOSGPR(self,X,Y,m_old, num_inducing,use_old_Z=True, driftZ = False, fixTheta = False):
-        try:
-            Zopt = copy(m_old.Z.param_array)
-            mu, Su = m_old.predict(Zopt, full_cov = True)
-            Su = Su + 1e-4*np.eye(mu.shape[0])
+    # try:
+        Zopt = copy(m_old.Z.param_array)
+        mu, Su = m_old.predict(Zopt, full_cov = True)
+        Su = Su + 5e-4*np.eye(mu.shape[0])
 
-            Kaa = m_old.kern.K(Zopt)
-            kern = GPy.kern.RBF(self.xdim,ARD=True)
-            kern.variance = copy(m_old.kern.variance)
-            kern.lengthscale = copy(m_old.kern.lengthscale)
+        Kaa = m_old.kern.K(Zopt)
+        kern = GPy.kern.RBF(self.xdim,ARD=True)
+        kern.variance = copy(m_old.kern.variance)
+        kern.lengthscale = copy(m_old.kern.lengthscale)
 
-            Zinit = self.init_Z(Zopt, X, num_inducing, use_old_Z, driftZ)
+        Zinit = self.init_Z(Zopt, X, num_inducing, use_old_Z, driftZ)
 
-            m_new = osgpr_GPy.OSGPR_VFE(X, Y, kern, mu, Su, Kaa,
-                Zopt, Zinit)
+        m_new = osgpr_GPy.OSGPR_VFE(X, Y, kern, mu, Su, Kaa,
+            Zopt, Zinit, m_old.likelihood)
 
-            m_new.likelihood.variance = copy(m_old.likelihood.variance)
-            # m_new.kern.variance = copy(m_old.kern.variance)
-            # m_new.kern.lengthscale = copy(m_old.kern.lengthscale)
-
-
-            "Fix parameters"
-            if driftZ:
-                m_new.Z.fix()
-
-            if fixTheta:
-                m_new.kern.fix()
-                m_new.likelihood.variance.fix()
+        # m_new.likelihood.variance = copy(m_old.likelihood.variance)
+        # m_new.kern.variance = copy(m_old.kern.variance)
+        # m_new.kern.lengthscale = copy(m_old.kern.lengthscale)
 
 
-            m_new.optimize()
-            # print('num_inducing: ' + str(len(m_new.Z)))
-            m_new.Z.unfix()
-            m_new.kern.unfix()
-            m_new.likelihood.variance.unfix()
-        except Warning:
-            warnings.warn("warning during training")
-            return m_old            
+        "Fix parameters"
+        if driftZ:
+            m_new.Z.fix()
+
+        if fixTheta:
+            m_new.kern.fix()
+            m_new.likelihood.variance.fix()
+
+
+        m_new.optimize()
+        # print('num_inducing: ' + str(len(m_new.Z)))
+        m_new.Z.unfix()
+        m_new.kern.unfix()
+        m_new.likelihood.variance.unfix()
+    # except Warning:
+    #     warnings.warn("warning during training")
+        # return m_old            
         return m_new
 
     def circular_mean(self,weights,angles):
@@ -424,6 +427,7 @@ class LocalModels():
                 wv = w/var
             else:
                 wv = w*np.exp(-s*dcw)/var
+                # wv = w*np.exp(-var)
 
             wv =np.nan_to_num(wv)
             

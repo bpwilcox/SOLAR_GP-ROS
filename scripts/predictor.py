@@ -18,7 +18,8 @@ from bwrobot.msg import *
 from copy import copy, deepcopy
 from baxter_core_msgs.msg import EndpointState
     
-
+import warnings
+warnings.simplefilter('always', UserWarning)
 
 
 class SolarPredictor():
@@ -158,9 +159,14 @@ class SolarPredictor():
                 xnext = self.curX + d*u 
 
             # Predict output joint angles (sin/cos)
-            Ypred, _ = self.model.prediction(xnext, Y_prev = Yexp)
-            Yexp = Ypred
+            try:
+                Ypred, _ = self.model.prediction(xnext, Y_prev = Yexp)
+                Yexp = Ypred
+            except:
+                warnings.warn("warning during prediction")
+                pass
             if np.isnan(Yexp).any():
+                warnings.warn("warning has prediction Nan")
                 continue
 
             # Publish joint angles (radians) 

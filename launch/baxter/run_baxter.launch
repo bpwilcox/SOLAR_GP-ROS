@@ -8,8 +8,8 @@
   <arg name="joint_names" default ="[s0, s1, e1, w1]" />
   <arg name="teleop_device" default ="xbox" />
   <arg name="bag_file" default ="/home/bpwilcox/catkin_ws/src/SOLAR_GP-ROS/bags/trajectories/test_left_1.bag" />
-  <arg name="filter_coefficient" default="0.2" />
-  <arg name="max_pred_distance" default="1" />
+  <arg name="filter_coefficient" default="0.05" />
+  <arg name="max_pred_distance" default="1.0" />
   <arg name="jit_init" default ="25" />
   <arg name="deg" default ="3" />
   <arg name="joint_init" default ="[0.67, 1.03, -0.5, -1.19, 1.94,-0.08,-1.0]" />

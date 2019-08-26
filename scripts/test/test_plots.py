@@ -131,84 +131,84 @@ for cdate, path in sorted(data):
     T = TestPlots(file, split_path[1], plot_path)
     T.extract_bag()
     T.make_plot()
-    Results[split_path[1]] = T.rmse
-    Data[T.num_inducing].append(T.rmse)
-    if str(round(T.wgen,3)) not in Data2:
-        Data2[str(round(T.wgen,3))] = [T.rmse]
-    else:
-        Data2[str(round(T.wgen,3))].append(T.rmse)
+    # Results[split_path[1]] = T.rmse
+    # Data[T.num_inducing].append(T.rmse)
+    # if str(round(T.wgen,3)) not in Data2:
+    #     Data2[str(round(T.wgen,3))] = [T.rmse]
+    # else:
+    #     Data2[str(round(T.wgen,3))].append(T.rmse)
 
     # name = split_path[1]
     # if name[:name.rfind('_')] == 'test_'
-num_ind = []
-min_rmse = []
-avg_rmse = []
+# num_ind = []
+# min_rmse = []
+# avg_rmse = []
 
-for key, value in Data.iteritems():
-    num_ind.append(key)
-    # print(len(value))
-    min_rmse.append(np.min(value))
-    avg_rmse.append(np.mean(value))
-
-
-labels = ['M = 8', 'M = 3', 'M = 2', 'M = 2', 'M = 2', 'M = 8', 'M = 1']
-ind = np.argsort(num_ind)
-
-# num_ind = num_ind[ind]
-# min_rmse = min_rmse[ind]
-
-new_ind = []
-new_rmse = []
-for i in range(0,len(num_ind)):
-    new_ind.append(num_ind[ind[i]])
-    new_rmse.append(min_rmse[ind[i]])
-
-pl.bar(new_ind, new_rmse, width = 3.0)
-pl.xticks(new_ind, new_ind)
-pl.xlabel('Number of inducing points')
-pl.ylabel('Minimum RMSE')
-for i, r in enumerate(new_ind):
-    pl.text(x = r-1.25 , y = new_rmse[i] + 0.0001, s = labels[i], size = 8)
-
-# pl.show()
-pl.savefig(plot_path + 'min_ind')
-pl.cla()
-
-pl.bar(num_ind, avg_rmse, width = 3.0)
-pl.xticks(num_ind, num_ind)
-pl.xlabel('Number of inducing points')
-pl.ylabel('Average RMSE')
-# pl.show()
-pl.savefig(plot_path + 'avg_ind')
-pl.cla()
+# for key, value in Data.iteritems():
+#     num_ind.append(key)
+#     # print(len(value))
+#     min_rmse.append(np.min(value))
+#     avg_rmse.append(np.mean(value))
 
 
-num_ind = []
-min_rmse = []
-avg_rmse = []
+# labels = ['M = 8', 'M = 3', 'M = 2', 'M = 2', 'M = 2', 'M = 8', 'M = 1']
+# ind = np.argsort(num_ind)
+
+# # num_ind = num_ind[ind]
+# # min_rmse = min_rmse[ind]
+
+# new_ind = []
+# new_rmse = []
+# for i in range(0,len(num_ind)):
+#     new_ind.append(num_ind[ind[i]])
+#     new_rmse.append(min_rmse[ind[i]])
+
+# pl.bar(new_ind, new_rmse, width = 3.0)
+# pl.xticks(new_ind, new_ind)
+# pl.xlabel('Number of inducing points')
+# pl.ylabel('Minimum RMSE')
+# for i, r in enumerate(new_ind):
+#     pl.text(x = r-1.25 , y = new_rmse[i] + 0.0001, s = labels[i], size = 8)
+
+# # pl.show()
+# pl.savefig(plot_path + 'min_ind')
+# pl.cla()
+
+# pl.bar(num_ind, avg_rmse, width = 3.0)
+# pl.xticks(num_ind, num_ind)
+# pl.xlabel('Number of inducing points')
+# pl.ylabel('Average RMSE')
+# # pl.show()
+# pl.savefig(plot_path + 'avg_ind')
+# pl.cla()
 
 
-for key, value in Data2.iteritems():
-    num_ind.append(key)
-    # print(len(value))
-    min_rmse.append(np.min(value))
-    avg_rmse.append(np.mean(value))
+# num_ind = []
+# min_rmse = []
+# avg_rmse = []
 
-pl.bar(num_ind, min_rmse, width = 0.3)
-pl.xticks(num_ind, num_ind)
-pl.xlabel('Distance Metric Threshold (wgen)')
-pl.ylabel('Minimum RMSE')
-# pl.show()
-pl.savefig(plot_path + 'min_wgen')
-pl.cla()
 
-pl.bar(num_ind, avg_rmse, width = 0.3)
-pl.xticks(num_ind, num_ind)
-pl.xlabel('Distance Metric Threshold (wgen)')
-pl.ylabel('Average RMSE')
-# pl.show()
-pl.savefig(plot_path + 'avg_wgen')
-pl.cla()
+# for key, value in Data2.iteritems():
+#     num_ind.append(key)
+#     # print(len(value))
+#     min_rmse.append(np.min(value))
+#     avg_rmse.append(np.mean(value))
+
+# pl.bar(num_ind, min_rmse, width = 0.3)
+# pl.xticks(num_ind, num_ind)
+# pl.xlabel('Distance Metric Threshold (wgen)')
+# pl.ylabel('Minimum RMSE')
+# # pl.show()
+# pl.savefig(plot_path + 'min_wgen')
+# pl.cla()
+
+# pl.bar(num_ind, avg_rmse, width = 0.3)
+# pl.xticks(num_ind, num_ind)
+# pl.xlabel('Distance Metric Threshold (wgen)')
+# pl.ylabel('Average RMSE')
+# # pl.show()
+# pl.savefig(plot_path + 'avg_wgen')
+# pl.cla()
 
 # f = open("SimResults.pkl","wb")
 # pickle.dump(Results,f)
