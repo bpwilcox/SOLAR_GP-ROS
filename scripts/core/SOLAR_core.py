@@ -2,7 +2,8 @@ import numpy as np
 import GPy
 import osgpr_GPy
 import sys
-sys.path.insert(0, '/home/bpwilcox/catkin_ws/src/SOLAR_GP-ROS/scripts/utilities')
+sys.path.insert(0, 'B:/Brian Wilcox/Documents/Git/SOLAR_GP-ROS/scripts/utilities')
+
 import circstats
 from copy import copy, deepcopy
 
@@ -170,10 +171,15 @@ class LocalModels():
                         self.UpdateY[j] = None
 
 
-                else:
+                else:     
+                    print(np.size(self.UpdateX[j]))
+                    if (np.size(self.UpdateX[j]) < 3):
+                        continue
                     print("Add New Model")
+                    print(np.shape(self.UpdateX[j]))
                     #m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.Models[j-1], self.num_inducing, fixTheta = False, driftZ = False,use_old_Z=True)
-                    m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.mdrift, self.num_inducing, fixTheta = False, driftZ = False,use_old_Z=False)
+#                    m = self.doOSGPR(self.UpdateX[j],self.UpdateY[j],self.mdrift, self.num_inducing, fixTheta = False, driftZ = False,use_old_Z=False)
+                    m = self.train_init(self.UpdateX[j],self.UpdateY[j],self.num_inducing)
 
                     self.Models.append(m)
                     self.LocalData[j][4] = True
@@ -321,7 +327,7 @@ class LocalModels():
         return Z
 
     def doOSGPR(self,X,Y,m_old, num_inducing,use_old_Z=True, driftZ = False, fixTheta = False):
-    # try:
+     try:
         Zopt = copy(m_old.Z.param_array)
         mu, Su = m_old.predict(Zopt, full_cov = True)
         Su = Su + 5e-4*np.eye(mu.shape[0])
@@ -355,10 +361,11 @@ class LocalModels():
         m_new.Z.unfix()
         m_new.kern.unfix()
         m_new.likelihood.variance.unfix()
-    # except Warning:
-    #     warnings.warn("warning during training")
-        # return m_old            
-        return m_new
+     except Warning:
+#         warnings.warn("warning during training")
+         print("warning during training")
+         return m_old            
+     return m_new
 
     def circular_mean(self,weights,angles):
         x = y = 0
@@ -380,6 +387,7 @@ class LocalModels():
 
     def prediction(self,xtest, weighted = True, bestm = 3, Y_prev = []):
         ypred = np.empty([np.shape(xtest)[0], self.ndim])
+        varmin = np.empty([np.shape(xtest)[0], self.ndim])
         for n in range(0, np.shape(xtest)[0], 1):
             w = np.empty([self.M, 1])
             dw = np.empty([self.M, 1])
@@ -432,7 +440,8 @@ class LocalModels():
             wv =np.nan_to_num(wv)
             
             wv = wv.reshape(self.M,)
-            varmin = np.min(var) # minimum variance of local predictions
+            ind = np.argpartition(wv, -h)[-h:]
+#            varmin[n] = np.min(var[ind]) # minimum variance of local predictions
             thresh = 0 # 0 uses all models
 
             "Select for best models"
@@ -442,7 +451,6 @@ class LocalModels():
             #     ind = wv > thresh
 
 
-            ind = np.argpartition(wv, -h)[-h:]
             # ypred[n] = np.dot(np.transpose(wv[ind]), yploc[ind]) / np.sum(wv[ind])
 
             if self.encode:
@@ -451,7 +459,7 @@ class LocalModels():
             else:
                 "Weighted circular mean of predictions"
                 ypred[n] = circstats.mean(yploc,axis = 0,w = wv.reshape(len(wv),1))
-
+                varmin[n] = np.dot(np.transpose(wv[ind]), var[ind]) / np.sum(wv[ind])
             "Debug Prints"
             #print("wv:" + str(wv))
             #print("w:" + str(w))
